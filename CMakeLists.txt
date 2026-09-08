@@ -163,6 +163,19 @@ if(COMPILE_VORBIS)
     target_link_libraries(RetroEngine libvorbis libogg)
 endif()
 
+if(COMPILE_THEORAPLAY)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(THEORA REQUIRED theoradec)
+
+    set(THEORAPLAY_DIR dependencies/${DEP_PATH}/theoraplay)
+    add_library(theoraplay STATIC
+        ${THEORAPLAY_DIR}/theoraplay.c
+    )
+    target_include_directories(theoraplay PRIVATE ${THEORAPLAY_DIR} ${THEORA_INCLUDE_DIRS})
+    target_include_directories(RetroEngine PRIVATE ${THEORAPLAY_DIR} ${THEORA_INCLUDE_DIRS})
+    target_link_libraries(RetroEngine theoraplay ${THEORA_LIBRARIES})
+endif()
+
 target_include_directories(RetroEngine PRIVATE
     RSDKv4/
     RSDKv4/NativeObjects/
