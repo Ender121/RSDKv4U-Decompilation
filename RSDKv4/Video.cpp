@@ -207,13 +207,13 @@ void UpdateVideoFrame()
 int ProcessVideo()
 {
     if (videoPlaying == VIDEOSTATUS_PLAYING_OGV) {
-        CheckKeyPress(keyPress);
+        CheckKeyPress(&keyPress);
 
         if (videoSkipped && fadeMode < 0xFF) {
             fadeMode += 8;
         }
 
-        if (inputDevice[0][INPUT_BUTTONA].press || inputDevice[0][INPUT_START].press > 0) {
+        if (keyPress.A || keyPress.start) {
             if (!videoSkipped)
                 fadeMode = 0;
 
