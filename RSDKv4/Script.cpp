@@ -4446,7 +4446,6 @@ void ProcessScript(int scriptCodePtr, int jumpTablePtr, byte scriptEvent)
                 opcodeSize = 0;
                 UpdateVideoFrame();
                 break;
-        }
 
         // Set Values
         if (opcodeSize > 0)
