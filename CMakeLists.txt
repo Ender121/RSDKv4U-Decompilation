@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(RetroEngine)
 
-set(DECOMP_VERSION 1.3.3)
+set(DECOMP_VERSION 1.3.3.U)
 
 set(RETRO_REVISION 3 CACHE STRING "What revision to compile for. Defaults to Origins = 3")
 option(RETRO_FORCE_CASE_INSENSITIVE "Forces case insensivity." OFF)
@@ -11,10 +11,6 @@ option(RETRO_NETWORKING "Enables or disables networking features used for Sonic 
 option(RETRO_USE_HW_RENDER "Enables usage of the Hardware Render, menus are unplayable without it." ON)
 option(RETRO_DISABLE_PLUS "Disables Plus. Should be set on for any public releases." OFF)
 option(RETRO_ORIGINAL_CODE "Removes any change that differs from the original code, a playable game can't be built this way." OFF)
-option(COMPILE_OGG "Compile libogg from source" ON)
-option(COMPILE_VORBIS "Compile libvorbis from source" ON)
-option(COMPILE_THEORA "Compile libtheora from source" ON)
-option(COMPILE_THEORAPLAY "Compile theoraplay and link it against libtheora/libvorbis/libogg" ON)
 
 set(RETRO_SDL_VERSION 2 CACHE STRING "Select between SDL2 and SDL1, defaults to SDL2")
 
