@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(RetroEngine)
 
-set(DECOMP_VERSION "1.3.3" CACHE STRING "Version of the decomp project")
+set(DECOMP_VERSION 1.3.3)
 
 set(RETRO_REVISION 3 CACHE STRING "What revision to compile for. Defaults to Origins = 3")
 option(RETRO_FORCE_CASE_INSENSITIVE "Forces case insensivity." OFF)
@@ -11,49 +11,21 @@ option(RETRO_NETWORKING "Enables or disables networking features used for Sonic 
 option(RETRO_USE_HW_RENDER "Enables usage of the Hardware Render, menus are unplayable without it." ON)
 option(RETRO_DISABLE_PLUS "Disables Plus. Should be set on for any public releases." OFF)
 option(RETRO_ORIGINAL_CODE "Removes any change that differs from the original code, a playable game can't be built this way." OFF)
-option(RETRO_USE_STEAM "Enables Plus if Origins Plus is found via Steam API." OFF)
 
-if(ANDROID) # TODO: dunno if its even possible on android, let alone how to do it anyway
-	option(RETRO_UPDATE_CHECKER "Enables or disables the update checker." OFF)
-else()
-	option(RETRO_UPDATE_CHECKER "Enables or disables the update checker." ON)
-endif()
-
-option(RETRO_USE_CURL "Compiles with cURL." OFF)
-option(RETRO_ACCEPT_OLD_SYNTAX "Allows compatibility with the old syntax." OFF)
-
-if(ANDROID)
-    option(RETRO_USE_DISCORD "Adds custom Discord RPC that says what zone you're on, the character you're playing as and some of your stats in the stage." OFF)
-else()
-    option(RETRO_USE_DISCORD "Adds custom Discord RPC that says what zone you're on, the character you're playing as and some of your stats in the stage." ON)
-endif()
-
-# note: sdl3 isn't actually in the engine BUT it is something I would like after looking at the features
-set(RETRO_SDL_VERSION 2 CACHE STRING "Select between SDL3, SDL2 and SDL1, defaults to SDL2")
-
-option(RETRO_VANILLA_LIKE "Brings back the normal v4 limitations." OFF)
-
-set(RETRO_ICON_NAME "RSDKv4 Decomp Icon.ico" CACHE STRING "Icon filename to embed in the executable. Defaults to RSDKv4 Decomp Icon.")
-
-set(STEAMWORKS_SDK_DIR "${CMAKE_SOURCE_DIR}/dependencies/all/steamworks_sdk")
-set(DISCORD_SDK_DIR "${CMAKE_SOURCE_DIR}/dependencies/all/discord_game_sdk")
+set(RETRO_SDL_VERSION 2 CACHE STRING "Select between SDL2 and SDL1, defaults to SDL2")
 
 if(RETRO_ORIGINAL_CODE)
     set(RETRO_MOD_LOADER OFF)
     set(RETRO_NETWORKING OFF)
 endif()
 
-if(RETRO_UPDATE_CHECKER)
-	set(RETRO_USE_CURL ON)
-endif()
+set(RETRO_NAME "RSDKv4")
 
-set(RETRO_OUTPUT_NAME "RSDKv4+" CACHE STRING "The exported name of the executable.")
+set(RETRO_OUTPUT_NAME ${RETRO_NAME} CACHE STRING "The exported name of the executable.")
 
 set(RETRO_FILES
     dependencies/all/tinyxml2/tinyxml2.cpp
-    dependencies/all/theoraplay/theoraplay.c
     RSDKv4/Animation.cpp
-    RSDKv4/API.cpp
     RSDKv4/Audio.cpp
     RSDKv4/Collision.cpp
     RSDKv4/Debug.cpp
@@ -130,26 +102,7 @@ if(NOT PLATFORM)
     endif()
 endif()
 
-if(CMAKE_SIZEOF_VOID_P EQUAL 4) # SHOULD work...?
-	message("System is supected to be 32 bit")
-	set(RETRO_ARCH "32")
-elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
-	message("System is supected to be 64 bit")
-	set(RETRO_ARCH "64")
-else()
-	# Might mean the system is 16/128bit
-	# Or its just because of an error
-	message("Error detecting system architecture")
-	set(RETRO_ARCH "INVALID")
-endif()
-
 include(platforms/${PLATFORM}.cmake)
-
-# https://github.com/discord/gamesdk-and-dispatch/issues/144
-# guess we gotta include <cstdint> manually
-if(RETRO_USE_DISCORD)
-	target_precompile_headers(RetroEngine PRIVATE RSDKv4/DiscordHeaders.hpp)
-endif()
 
 set_target_properties(RetroEngine PROPERTIES OUTPUT_NAME ${RETRO_OUTPUT_NAME})
 
@@ -251,15 +204,9 @@ if(COMPILE_THEORA)
     target_link_libraries(RetroEngine libtheora)
 endif()
 
-if(RETRO_USE_CURL)
-	find_package(CURL REQUIRED)
-	target_link_libraries(RetroEngine CURL::libcurl)
-endif()
-
 target_include_directories(RetroEngine PRIVATE
     RSDKv4/
     RSDKv4/NativeObjects/
-    dependencies/all/theoraplay/
     dependencies/all/stb-image/
     dependencies/all/tinyxml2/
 )
@@ -276,23 +223,6 @@ if(DEFINED DEP_PATH)
     )
 endif()
 
-if(RETRO_USE_STEAM)
-	target_include_directories(RetroEngine PRIVATE
-		dependencies/all/steamworks_sdk/public/
-	)
-endif()
-
-if(RETRO_USE_DISCORD)
-	target_include_directories(RetroEngine PRIVATE
-		dependencies/all/discord_game_sdk/
-		dependencies/all/discord_game_sdk/cpp/
-		dependencies/all/discord_game_sdk/lib/x86/
-		dependencies/all/discord_game_sdk/lib/x86_64/
-	)
-
-	file(GLOB DISCORD_SRC ${DISCORD_SDK_DIR}/cpp/*.cpp)
-	target_sources(RetroEngine PRIVATE ${DISCORD_SRC})
-endif()
 
 target_compile_definitions(RetroEngine PRIVATE
     RSDK_REVISION=${RETRO_REVISION}
@@ -302,16 +232,9 @@ target_compile_definitions(RetroEngine PRIVATE
     RETRO_USE_SDL${RETRO_SDL_VERSION}=1
     FORCE_CASE_INSENSITIVE=$<BOOL:${RETRO_FORCE_CASE_INSENSITIVE}>
     RETRO_USE_ORIGINAL_CODE=$<BOOL:${RETRO_ORIGINAL_CODE}>
-    RETRO_USE_STEAMWORKS=$<BOOL:${RETRO_USE_STEAM}>
-    RETRO_USE_DISCORD_SDK=$<BOOL:${RETRO_USE_DISCORD}>
-    RETRO_CHECKUPDATE=$<BOOL:${RETRO_UPDATE_CHECKER}>
-    RETRO_ACCEPT_OLD_SYNTAX=$<BOOL:${RETRO_ACCEPT_OLD_SYNTAX}>
-    RETRO_VANILLA_LIKE=$<BOOL:${RETRO_VANILLA_LIKE}>
-
+    
     RSDK_AUTOBUILD=$<BOOL:${RETRO_DISABLE_PLUS}>
-
+    
     RETRO_DEV_EXTRA="${PLATFORM} - ${CMAKE_CXX_COMPILER_ID}"
     DECOMP_VERSION="${DECOMP_VERSION}"
-    RETRO_ICON_NAME="${RETRO_ICON_NAME}"
-    RETRO_OUTPUT_NAME="${RETRO_OUTPUT_NAME}"
 )
