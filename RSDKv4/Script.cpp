@@ -1,4 +1,5 @@
 #include "RetroEngine.hpp"
+#include "Video.hpp"
 #include <cmath>
 
 ObjectScript objectScriptList[OBJECT_COUNT];
@@ -1076,7 +1077,7 @@ void CheckAliasText(char *text)
         if (StrComp(priv ? privateAliases[v].name : publicAliases[v].name, a->name)) {
             char buf[0x40];
             sprintf(buf, "Warning: Alias %s has already been used!", a->name);
-            printLog(buf);
+            PrintLog(buf);
         }
     }
 
@@ -1139,7 +1140,7 @@ void CheckStaticText(char *text)
         if (StrComp(priv ? privateStaticVariables[v].name : publicStaticVariables[v].name, var->name)) {
             char buf[0x40];
             sprintf(buf, "Warning: Variable %s has already been used!", var->name);
-            printLog(buf);
+            PrintLog(buf);
         }
     }
 
@@ -1556,7 +1557,7 @@ void ConvertFunctionText(char *text)
                 if (o == OBJECT_COUNT) {
                     char buf[0x40];
                     sprintf(buf, "WARNING: Unknown typename \"%s\"", arrayStr);
-                    printLog(buf);
+                    PrintLog(buf);
                 }
             }
 
@@ -1576,7 +1577,7 @@ void ConvertFunctionText(char *text)
                 if (s == SFX_COUNT) {
                     char buf[0x40];
                     sprintf(buf, "WARNING: Unknown sfxName \"%s\"", arrayStr);
-                    printLog(buf);
+                    PrintLog(buf);
                 }
             }
 
@@ -2105,7 +2106,7 @@ void ParseScriptFile(char *scriptName, int scriptID)
                         else {
                             char buf[0x40];
                             sprintf(buf, "Warning: Function %s has already been reserved!", funcName);
-                            printLog(buf);
+                            PrintLog(buf);
                         }
                         parseMode = PARSEMODE_SCOPELESS;
                     }
@@ -2224,7 +2225,7 @@ void ParseScriptFile(char *scriptName, int scriptID)
                                 if (StrComp(publicTables[t].name, currentTable->name)) {
                                     char buf[0x40];
                                     sprintf(buf, "Warning: Table %s has already been used!", currentTable->name);
-                                    printLog(buf);
+                                    PrintLog(buf);
                                 }
                             }
 
@@ -2236,7 +2237,7 @@ void ParseScriptFile(char *scriptName, int scriptID)
                                 if (StrComp(privateTables[t].name, currentTable->name)) {
                                     char buf[0x40];
                                     sprintf(buf, "Warning: Table %s has already been used!", currentTable->name);
-                                    printLog(buf);
+                                    PrintLog(buf);
                                 }
                             }
 
@@ -4446,7 +4447,6 @@ void ProcessScript(int scriptCodePtr, int jumpTablePtr, byte scriptEvent)
                 opcodeSize = 0;
                 UpdateVideoFrame();
                 break;
-        }
 
         // Set Values
         if (opcodeSize > 0)
