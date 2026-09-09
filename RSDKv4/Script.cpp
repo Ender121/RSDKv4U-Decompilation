@@ -5353,7 +5353,6 @@ void ProcessScript(int scriptCodeStart, int jumpTableStart, byte scriptEvent)
                 opcodeSize = 0;
                 UpdateVideoFrame();
                 break;
-        }
 
 #if !RETRO_REV02
             case FUNC_LOADTEXTFONT: {
