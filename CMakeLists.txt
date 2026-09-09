@@ -9,7 +9,7 @@ option(RETRO_FORCE_CASE_INSENSITIVE "Forces case insensivity." OFF)
 option(RETRO_MOD_LOADER "Enables or disables the mod loader." ON)
 option(RETRO_NETWORKING "Enables or disables networking features used for Sonic 2's 2P VS mode." ON)
 option(RETRO_USE_HW_RENDER "Enables usage of the Hardware Render, menus are unplayable without it." ON)
-option(RETRO_DISABLE_PLUS "Disables Plus. Should be set on for any public releases." OFF)
+option(RETRO_DISABLE_PLUS "Disables Plus. Should be set on for any public releases." ON)
 option(RETRO_ORIGINAL_CODE "Removes any change that differs from the original code, a playable game can't be built this way." OFF)
 option(COMPILE_THEORAPLAY "Compile theoraplay and link libtheora for video playback" ON)
 
