@@ -17,4 +17,3 @@ gcc -o ./testtheoraplay $CFLAGS ../theoraplay.c ./testtheoraplay.c -logg -lvorbi
 gcc -o ./simplesdl $CFLAGS ../theoraplay.c ./simplesdl.c `sdl-config --cflags --libs`  -logg -lvorbis -ltheoradec $LINKFLAGS
 gcc -o ./sdltheoraplay $CFLAGS ../theoraplay.c ./sdltheoraplay.c `sdl-config --cflags --libs`  -logg -lvorbis -ltheoradec $LINKFLAGS $LINKGLFLAGS
 
-
