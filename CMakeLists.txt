@@ -165,7 +165,7 @@ if(COMPILE_VORBIS)
 endif()
 
 if(COMPILE_THEORA)
-    set(THEORA_DIR dependencies/${DEP_PATH}/libtheora)
+    set(THEORA_DIR dependencies/all/libtheora)
 
     add_library(libtheora STATIC
         ${THEORA_DIR}/lib/analyze.c
@@ -205,7 +205,7 @@ if(COMPILE_THEORA)
 endif()
 
 if(COMPILE_THEORAPLAY)
-    set(THEORAPLAY_DIR dependencies/${DEP_PATH}/theoraplay)
+    set(THEORAPLAY_DIR dependencies/all/theoraplay)
 
     add_library(theoraplay STATIC
         ${THEORAPLAY_DIR}/theoraplay.c
