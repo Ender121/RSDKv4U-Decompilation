@@ -28,6 +28,7 @@
 // ================
 #include <stdio.h>
 #include <string.h>
+#include "Video.hpp"
 #include <cmath>
 #if RETRO_USE_MOD_LOADER
 #include <regex>
