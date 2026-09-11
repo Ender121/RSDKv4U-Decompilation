@@ -66,6 +66,7 @@ int InitAudioPlayback()
         PrintLog("Unable to open audio device: %s", SDL_GetError());
         audioEnabled = false;
         return true; // no audio but game wont crash now
+    }
 
     // Init video sound stuff
     // TODO: Unfortunately, we're assuming that video sound is stereo at 48000Hz.
@@ -74,7 +75,7 @@ int InitAudioPlayback()
     // makes this awkward.
     ogv_stream = SDL_NewAudioStream(AUDIO_F32SYS, 2, 48000, audioDeviceFormat.format, audioDeviceFormat.channels, audioDeviceFormat.freq);
     if (!ogv_stream) {
-        printLog("Failed to create stream: %s", SDL_GetError());
+        PrintLog("Failed to create stream: %s", SDL_GetError());
         SDL_CloseAudioDevice(audioDevice);
         audioEnabled = false;
         return true; // no audio but game wont crash now

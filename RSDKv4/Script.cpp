@@ -5527,7 +5527,7 @@ void ProcessScript(int scriptCodeStart, int jumpTableStart, byte scriptEvent)
             case FUNC_LOADVIDEO:
                 opcodeSize = 0;
                 // PauseSound();
-                StopMusic();
+                StopMusic(true);
                 if (FindStringToken(scriptText, ".rsv", 1) <= -1)
                     PlayVideoFile(scriptText); // not an rsv
                 else
