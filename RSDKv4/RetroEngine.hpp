@@ -28,7 +28,6 @@
 // ================
 #include <stdio.h>
 #include <string.h>
-#include "Video.hpp"
 #include <cmath>
 #if RETRO_USE_MOD_LOADER
 #include <regex>
@@ -329,6 +328,7 @@ extern bool engineDebugMode;
 #include "String.hpp"
 #include "Animation.hpp"
 #include "Audio.hpp"
+#include "Video.hpp"
 #include "Input.hpp"
 #include "Object.hpp"
 #include "Palette.hpp"
