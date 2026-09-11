@@ -304,6 +304,14 @@ enum RetroGameType {
 #include <SDL2/SDL.h>
 #include <Vorbis/vorbisfile.h>
 
+ <theora/theora.h>
+#include <theoraplay.h>
+#elif RETRO_PLATFORM == RETRO_OSX
+#include <SDL2/SDL.h>
+#include <Vorbis/vorbisfile.h>
+#include <theora/theora.h>
+#include <theoraplay.h>
+
 #include "cocoaHelpers.hpp"
 
 #elif RETRO_USING_SDL2
@@ -328,7 +336,6 @@ extern bool engineDebugMode;
 #include "String.hpp"
 #include "Animation.hpp"
 #include "Audio.hpp"
-#include "Video.hpp"
 #include "Input.hpp"
 #include "Object.hpp"
 #include "Palette.hpp"

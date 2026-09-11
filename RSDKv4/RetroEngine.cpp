@@ -603,26 +603,6 @@ void RetroEngine::Run()
         }
     }
 
-    WriteUserdata();
-    ReleaseAudioDevice();
-    StopVideoPlayback();
-    ReleaseRenderDevice();
-#if !RETRO_USE_ORIGINAL_CODE
-    ReleaseInputDevices();
-#if RETRO_USE_NETWORKING
-    DisconnectNetwork(true);
-#endif
-    WriteSettings();
-#if RETRO_USE_MOD_LOADER
-    SaveMods();
-#endif
-#endif
-
-#if RETRO_USING_SDL1 || RETRO_USING_SDL2
-    SDL_Quit();
-#endif
-}
-
     ReleaseAudioDevice();
     ReleaseRenderDevice();
 #if !RETRO_USE_ORIGINAL_CODE
