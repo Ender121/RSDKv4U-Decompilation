@@ -29,7 +29,7 @@ const int LZ_BITS       = 12;
 const int FIRST_CODE    = 4097;
 const int NO_SUCH_CODE  = 4098;
 
-GifDecoder gifDecoder;
+struct GifDecoder gifDecoder;
 int codeMasks[] = { 0, 1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047, 4095 };
 
 int ReadGifCode(void);
@@ -38,35 +38,36 @@ byte TraceGifPrefix(uint *prefix, int code, int clearCode);
 
 void InitGifDecoder()
 {
-    byte code = 0;
-    FileRead(&code, 1);
+    byte val = 0;
+    FileRead(&val, 1);
     gifDecoder.fileState      = LOADING_IMAGE;
     gifDecoder.position       = 0;
     gifDecoder.bufferSize     = 0;
     gifDecoder.buffer[0]      = 0;
-    gifDecoder.depth          = code;
-    gifDecoder.clearCode      = 1 << code;
+    gifDecoder.depth          = val;
+    gifDecoder.clearCode      = 1 << val;
     gifDecoder.eofCode        = gifDecoder.clearCode + 1;
     gifDecoder.runningCode    = gifDecoder.eofCode + 1;
-    gifDecoder.runningBits    = code + 1;
+    gifDecoder.runningBits    = val + 1;
     gifDecoder.maxCodePlusOne = 1 << gifDecoder.runningBits;
     gifDecoder.stackPtr       = 0;
     gifDecoder.prevCode       = NO_SUCH_CODE;
     gifDecoder.shiftState     = 0;
-    gifDecoder.shiftData      = 0;
+    gifDecoder.shiftData      = 0u;
     for (int i = 0; i <= LZ_MAX_CODE; ++i) gifDecoder.prefix[i] = (byte)NO_SUCH_CODE;
 }
 void ReadGifLine(byte *line, int length, int offset)
 {
     int i         = 0;
-    int stackPtr  = gifDecoder.stackPtr;
+    int stackPtr       = gifDecoder.stackPtr;
     int eofCode   = gifDecoder.eofCode;
     int clearCode = gifDecoder.clearCode;
-    int prevCode  = gifDecoder.prevCode;
+    int prevCode      = gifDecoder.prevCode;
     if (stackPtr != 0) {
         while (stackPtr != 0) {
-            if (i >= length)
+            if (i >= length) {
                 break;
+            }
             line[offset++] = gifDecoder.stack[--stackPtr];
             i++;
         }
@@ -74,13 +75,16 @@ void ReadGifLine(byte *line, int length, int offset)
     while (i < length) {
         int gifCode = ReadGifCode();
         if (gifCode == eofCode) {
-            if (i != length - 1 || gifDecoder.pixelCount != 0)
+            if (i != length - 1 | gifDecoder.pixelCount != 0u) {
                 return;
+            }
             i++;
         }
         else {
             if (gifCode == clearCode) {
-                for (int p = 0; p <= LZ_MAX_CODE; p++) gifDecoder.prefix[p] = NO_SUCH_CODE;
+                for (int j = 0; j <= LZ_MAX_CODE; j++) {
+                    gifDecoder.prefix[j] = NO_SUCH_CODE;
+                }
                 gifDecoder.runningCode    = gifDecoder.eofCode + 1;
                 gifDecoder.runningBits    = gifDecoder.depth + 1;
                 gifDecoder.maxCodePlusOne = 1 << gifDecoder.runningBits;
@@ -93,17 +97,17 @@ void ReadGifLine(byte *line, int length, int offset)
                     i++;
                 }
                 else {
-                    if (gifCode < 0 || gifCode > LZ_MAX_CODE)
+                    if (gifCode<0 | gifCode> LZ_MAX_CODE) {
                         return;
-
-                    int code = 0;
+                    }
+                    int code;
                     if (gifDecoder.prefix[gifCode] == NO_SUCH_CODE) {
-                        if (gifCode != gifDecoder.runningCode - 2)
+                        if (gifCode != gifDecoder.runningCode - 2) {
                             return;
-
-                        code                                          = prevCode;
-                        gifDecoder.suffix[gifDecoder.runningCode - 2] = gifDecoder.stack[stackPtr++] =
-                            TraceGifPrefix(gifDecoder.prefix, prevCode, clearCode);
+                        }
+                        code = prevCode;
+                        gifDecoder.suffix[gifDecoder.runningCode - 2] =
+                            (gifDecoder.stack[stackPtr++] = TraceGifPrefix(gifDecoder.prefix, prevCode, clearCode));
                     }
                     else {
                         code = gifCode;
@@ -111,23 +115,27 @@ void ReadGifLine(byte *line, int length, int offset)
                     int c = 0;
                     while (c++ <= LZ_MAX_CODE && code > clearCode && code <= LZ_MAX_CODE) {
                         gifDecoder.stack[stackPtr++] = gifDecoder.suffix[code];
-                        code                         = gifDecoder.prefix[code];
+                        code                    = gifDecoder.prefix[code];
                     }
-                    if (c >= LZ_MAX_CODE || code > LZ_MAX_CODE)
+                    if (c >= LZ_MAX_CODE | code > LZ_MAX_CODE) {
                         return;
-
+                    }
                     gifDecoder.stack[stackPtr++] = (byte)code;
-                    while (stackPtr != 0 && i++ < length) line[offset++] = gifDecoder.stack[--stackPtr];
+                    while (stackPtr != 0 && i++ < length) {
+                        line[offset++] = gifDecoder.stack[--stackPtr];
+                    }
                 }
                 if (prevCode != NO_SUCH_CODE) {
-                    if (gifDecoder.runningCode < 2 || gifDecoder.runningCode > FIRST_CODE)
+                    if (gifDecoder.runningCode<2 | gifDecoder.runningCode> FIRST_CODE) {
                         return;
-
+                    }
                     gifDecoder.prefix[gifDecoder.runningCode - 2] = prevCode;
-                    if (gifCode == gifDecoder.runningCode - 2)
+                    if (gifCode == gifDecoder.runningCode - 2) {
                         gifDecoder.suffix[gifDecoder.runningCode - 2] = TraceGifPrefix(gifDecoder.prefix, prevCode, clearCode);
-                    else
+                    }
+                    else {
                         gifDecoder.suffix[gifDecoder.runningCode - 2] = TraceGifPrefix(gifDecoder.prefix, gifCode, clearCode);
+                    }
                 }
                 prevCode = gifCode;
             }
@@ -144,19 +152,19 @@ int ReadGifCode()
         gifDecoder.shiftData |= (uint)((uint)b << gifDecoder.shiftState);
         gifDecoder.shiftState += 8;
     }
-    int code = (gifDecoder.shiftData & codeMasks[gifDecoder.runningBits]);
+    int result = (int)((unsigned long)gifDecoder.shiftData & (unsigned long)(codeMasks[gifDecoder.runningBits]));
     gifDecoder.shiftData >>= gifDecoder.runningBits;
     gifDecoder.shiftState -= gifDecoder.runningBits;
     if (++gifDecoder.runningCode > gifDecoder.maxCodePlusOne && gifDecoder.runningBits < LZ_BITS) {
         gifDecoder.maxCodePlusOne <<= 1;
         gifDecoder.runningBits++;
     }
-    return code;
+    return result;
 }
 
 byte ReadGifByte()
 {
-    byte c = 0;
+    byte c = '\0';
     if (gifDecoder.fileState == LOAD_COMPLETE)
         return c;
 
@@ -187,17 +195,18 @@ byte TraceGifPrefix(uint *prefix, int code, int clearCode)
 }
 void ReadGifPictureData(int width, int height, bool interlaced, byte *gfxData, int offset)
 {
-    int initialRow[] = { 0, 4, 2, 1 };
-    int rowInc[]     = { 8, 8, 4, 2 };
+    int array[]  = { 0, 4, 2, 1 };
+    int array2[] = { 8, 8, 4, 2 };
     InitGifDecoder();
     if (interlaced) {
-        for (int p = 0; p < 4; ++p) {
-            for (int y = initialRow[p]; y < height; y += rowInc[p]) ReadGifLine(gfxData, width, y * width + offset);
+        for (int i = 0; i < 4; ++i) {
+            for (int j = array[i]; j < height; j += array2[i]) {
+                ReadGifLine(gfxData, width, j * width + offset);
+            }
         }
+        return;
     }
-    else {
-        for (int y = 0; y < height; ++y) ReadGifLine(gfxData, width, y * width + offset);
-    }
+    for (int h = 0; h < height; ++h) ReadGifLine(gfxData, width, h * width + offset);
 }
 
 int AddGraphicsFile(const char *filePath)
@@ -210,7 +219,7 @@ int AddGraphicsFile(const char *filePath)
     while (StrLength(gfxSurface[sheetID].fileName) > 0) {
         if (StrComp(gfxSurface[sheetID].fileName, sheetPath))
             return sheetID;
-        if (++sheetID == SURFACE_COUNT) // Max Sheet cnt
+        if (++sheetID == SURFACE_MAX) // Max Sheet cnt
             return 0;
     }
     byte fileExtension = (byte)sheetPath[(StrLength(sheetPath) - 1) & 0xFF];
@@ -218,6 +227,7 @@ int AddGraphicsFile(const char *filePath)
         case 'f': LoadGIFFile(sheetPath, sheetID); break;
         case 'p': LoadBMPFile(sheetPath, sheetID); break;
         case 'r': LoadPVRFile(sheetPath, sheetID); break;
+        case 'v': LoadRSVFile(sheetPath, sheetID); break;
     }
 
     return sheetID;
@@ -225,7 +235,7 @@ int AddGraphicsFile(const char *filePath)
 void RemoveGraphicsFile(const char *filePath, int sheetID)
 {
     if (sheetID < 0) {
-        for (int i = 0; i < SURFACE_COUNT; ++i) {
+        for (int i = 0; i < SURFACE_MAX; ++i) {
             if (StrLength(gfxSurface[i].fileName) > 0 && StrComp(gfxSurface[i].fileName, filePath))
                 sheetID = i;
         }
@@ -235,9 +245,9 @@ void RemoveGraphicsFile(const char *filePath, int sheetID)
         StrCopy(gfxSurface[sheetID].fileName, "");
         int dataPosStart = gfxSurface[sheetID].dataPosition;
         int dataPosEnd   = gfxSurface[sheetID].dataPosition + gfxSurface[sheetID].height * gfxSurface[sheetID].width;
-        for (int i = GFXDATA_SIZE - dataPosEnd; i > 0; --i) graphicData[dataPosStart++] = graphicData[dataPosEnd++];
+        for (int i = GFXDATA_MAX - dataPosEnd; i > 0; --i) graphicData[dataPosStart++] = graphicData[dataPosEnd++];
         gfxDataPosition -= gfxSurface[sheetID].height * gfxSurface[sheetID].width;
-        for (int i = 0; i < SURFACE_COUNT; ++i) {
+        for (int i = 0; i < SURFACE_MAX; ++i) {
             if (gfxSurface[i].dataPosition > gfxSurface[sheetID].dataPosition)
                 gfxSurface[i].dataPosition -= gfxSurface[sheetID].height * gfxSurface[sheetID].width;
         }
@@ -257,20 +267,20 @@ int LoadBMPFile(const char *filePath, byte sheetID)
         FileRead(&fileBuffer, 1);
         surface->width = fileBuffer;
         FileRead(&fileBuffer, 1);
-        surface->width |= fileBuffer << 8;
+        surface->width += fileBuffer << 8;
         FileRead(&fileBuffer, 1);
-        surface->width |= fileBuffer << 16;
+        surface->width += fileBuffer << 16;
         FileRead(&fileBuffer, 1);
-        surface->width |= fileBuffer << 24;
+        surface->width += fileBuffer << 24;
 
         FileRead(&fileBuffer, 1);
         surface->height = fileBuffer;
         FileRead(&fileBuffer, 1);
-        surface->height |= fileBuffer << 8;
+        surface->height += fileBuffer << 8;
         FileRead(&fileBuffer, 1);
-        surface->height |= fileBuffer << 16;
+        surface->height += fileBuffer << 16;
         FileRead(&fileBuffer, 1);
-        surface->height |= fileBuffer << 24;
+        surface->height += fileBuffer << 24;
 
         SetFilePosition(info.vfileSize - surface->height * surface->width);
         surface->dataPosition = gfxDataPosition;
@@ -284,18 +294,16 @@ int LoadBMPFile(const char *filePath, byte sheetID)
         }
         gfxDataPosition += surface->height * surface->width;
 
-#if RETRO_SOFTWARE_RENDER
         surface->widthShift = 0;
         int w               = surface->width;
         while (w > 1) {
             w >>= 1;
             ++surface->widthShift;
         }
-#endif
 
-        if (gfxDataPosition >= GFXDATA_SIZE) {
+        if (gfxDataPosition >= GFXDATA_MAX) {
             gfxDataPosition = 0;
-            PrintLog("WARNING: Exceeded max gfx size!");
+            printLog("WARNING: Exceeded max gfx size!");
         }
 
         CloseFile();
@@ -316,19 +324,14 @@ int LoadGIFFile(const char *filePath, byte sheetID)
         FileRead(&fileBuffer, 1);
         surface->width = fileBuffer;
         FileRead(&fileBuffer, 1);
-        surface->width |= fileBuffer << 8;
+        surface->width += (fileBuffer << 8);
         FileRead(&fileBuffer, 1);
         surface->height = fileBuffer;
         FileRead(&fileBuffer, 1);
-        surface->height |= fileBuffer << 8;
+        surface->height += (fileBuffer << 8);
 
-        FileRead(&fileBuffer, 1); // Palette Size
-        // int has_pallete  = (fileBuffer & 0x80) >> 7;
-        // int colors       = ((fileBuffer & 0x70) >> 4) + 1;
-        int palette_size = (fileBuffer & 0x7) + 1;
-        if (palette_size > 0)
-            palette_size = 1 << palette_size;
-        FileRead(&fileBuffer, 1); // BG Color index (thrown away)
+        FileRead(&fileBuffer, 1); // Palette Size (thrown away) :/
+        FileRead(&fileBuffer, 1); // BG Colour index (thrown away)
         FileRead(&fileBuffer, 1); // idk actually (still thrown away)
 
         int c = 0;
@@ -336,7 +339,7 @@ int LoadGIFFile(const char *filePath, byte sheetID)
         do {
             ++c;
             FileRead(clr, 3);
-        } while (c != palette_size);
+        } while (c != 0x100);
 
         FileRead(&fileBuffer, 1);
         while (fileBuffer != ',') FileRead(&fileBuffer, 1); // gif image start identifier
@@ -357,23 +360,64 @@ int LoadGIFFile(const char *filePath, byte sheetID)
         }
 
         surface->dataPosition = gfxDataPosition;
-
-#if RETRO_SOFTWARE_RENDER
-        surface->widthShift = 0;
-        int w               = surface->width;
+        surface->widthShift   = 0;
+        int w                 = surface->width;
         while (w > 1) {
             w >>= 1;
             ++surface->widthShift;
         }
-#endif
 
         gfxDataPosition += surface->width * surface->height;
-        if (gfxDataPosition < GFXDATA_SIZE) {
+        if (gfxDataPosition < GFXDATA_MAX) {
             ReadGifPictureData(surface->width, surface->height, interlaced, graphicData, surface->dataPosition);
         }
         else {
             gfxDataPosition = 0;
-            PrintLog("WARNING: Exceeded max gfx size!");
+            printLog("WARNING: Exceeded max gfx size!");
+        }
+
+        CloseFile();
+        return true;
+    }
+    return false;
+}
+int LoadRSVFile(const char *filePath, byte sheetID)
+{
+    FileInfo info;
+    if (LoadFile(filePath, &info)) {
+        GFXSurface *surface = &gfxSurface[sheetID];
+        StrCopy(surface->fileName, filePath);
+
+        videoData         = sheetID;
+        currentVideoFrame = 0;
+
+        byte fileBuffer = 0;
+
+        FileRead(&fileBuffer, 1);
+        videoFrameCount = fileBuffer;
+        FileRead(&fileBuffer, 1);
+        videoFrameCount += fileBuffer << 8;
+
+        FileRead(&fileBuffer, 1);
+        videoWidth = fileBuffer;
+        FileRead(&fileBuffer, 1);
+        videoWidth += fileBuffer << 8;
+
+        FileRead(&fileBuffer, 1);
+        videoHeight = fileBuffer;
+        FileRead(&fileBuffer, 1);
+        videoHeight += fileBuffer << 8;
+
+        videoFilePos   = (int)GetFilePosition();
+        videoPlaying   = true;
+        surface->height       = videoWidth;
+        surface->width        = videoHeight;
+        surface->dataPosition = gfxDataPosition;
+        gfxDataPosition += surface->width * surface->height;
+
+        if (gfxDataPosition >= GFXDATA_MAX) {
+            gfxDataPosition = 0;
+            printLog("WARNING: Exceeded max gfx size!");
         }
 
         CloseFile();
@@ -395,7 +439,7 @@ int LoadPVRFile(const char *filePath, byte sheetID)
         FileRead(fileBuffer, 1);
         int width = fileBuffer[0];
         FileRead(fileBuffer, 1);
-        width |= fileBuffer[0] << 8;
+        width += fileBuffer[0] << 8;
         FileRead(fileBuffer, 1);
         int height = fileBuffer[0];
         FileRead(fileBuffer, 1);
@@ -406,19 +450,17 @@ int LoadPVRFile(const char *filePath, byte sheetID)
         surface->dataPosition = gfxDataPosition;
         gfxDataPosition += surface->width * surface->height;
 
-        if (gfxDataPosition >= GFXDATA_SIZE) {
+        if (gfxDataPosition >= GFXDATA_MAX) {
             gfxDataPosition = 0;
-            PrintLog("WARNING: Exceeded max gfx size!");
+            printLog("WARNING: Exceeded max gfx size!");
         }
 
-#if RETRO_SOFTWARE_RENDER
         surface->widthShift = 0;
         int w               = surface->width;
         while (w > 1) {
             w >>= 1;
             ++surface->widthShift;
         }
-#endif
 
         return false; // yeah I have no clue how to handle this, cd lite has this be loaded every frame on framebuffer update and does it that way
 

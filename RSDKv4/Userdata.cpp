@@ -4,230 +4,36 @@ int globalVariablesCount;
 int globalVariables[GLOBALVAR_COUNT];
 char globalVariableNames[GLOBALVAR_COUNT][0x20];
 
-void *nativeFunction[NATIIVEFUNCTION_COUNT];
+int (*nativeFunction[16])(int, void *);
 int nativeFunctionCount = 0;
 
 char gamePath[0x100];
-int saveRAM[SAVEDATA_SIZE];
-Achievement achievements[ACHIEVEMENT_COUNT];
-int achievementCount = 0;
-
-LeaderboardEntry leaderboards[LEADERBOARD_COUNT];
+int saveRAM[SAVEDATA_MAX];
+Achievement achievements[ACHIEVEMENT_MAX];
+LeaderboardEntry leaderboard[LEADERBOARD_MAX];
 
 MultiplayerData multiplayerDataIN  = MultiplayerData();
 MultiplayerData multiplayerDataOUT = MultiplayerData();
 int matchValueData[0x100];
-byte matchValueReadPos  = 0;
-byte matchValueWritePos = 0;
+int matchValueReadPos  = 0;
+int matchValueWritePos = 0;
 
-int vsGameLength = 4;
-int vsItemMode   = 1;
-int vsPlayerID   = 0;
-bool vsPlaying   = false;
+int sendDataMethod = 0;
+int sendCounter    = 0;
 
-int sendCounter = 0;
-
-#if RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_LINUX
-#include <sys/stat.h>
-#include <sys/types.h>
-#endif
-
-#if !RETRO_USE_ORIGINAL_CODE
-bool forceUseScripts         = false;
-bool forceUseScripts_Config  = false;
-bool skipStartMenu           = false;
-bool skipStartMenu_Config    = false;
-int disableFocusPause        = 0;
-int disableFocusPause_Config = 0;
-
-bool useSGame = false;
-
-bool ReadSaveRAMData()
-{
-    useSGame = false;
-    char buffer[0x180];
-#if RETRO_USE_MOD_LOADER
-#if RETRO_PLATFORM == RETRO_UWP
-    if (!usingCWD)
-        sprintf(buffer, "%s/%sSData.bin", redirectSave ? modsPath : getResourcesPath(), savePath);
-    else
-        sprintf(buffer, "%s%sSData.bin", redirectSave ? modsPath : gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-    sprintf(buffer, "%s/%sSData.bin", redirectSave ? modsPath : gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_iOS
-    sprintf(buffer, "%s/%sSData.bin", redirectSave ? modsPath : getDocumentsPath(), savePath);
-#else
-    sprintf(buffer, "%s%sSData.bin", redirectSave ? modsPath : gamePath, savePath);
-#endif
-#else
-#if RETRO_PLATFORM == RETRO_UWP
-    if (!usingCWD)
-        sprintf(buffer, "%s/%sSData.bin", getResourcesPath(), savePath);
-    else
-        sprintf(buffer, "%s%sSData.bin", gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-    sprintf(buffer, "%s/%sSData.bin", gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_iOS
-    sprintf(buffer, "%s/%sSData.bin", getDocumentsPath(), savePath);
-#else
-    sprintf(buffer, "%s%sSData.bin", gamePath, savePath);
-#endif
-#endif
-
-    FileIO *saveFile = fOpen(buffer, "rb");
-    if (!saveFile) {
-#if RETRO_USE_MOD_LOADER
-#if RETRO_PLATFORM == RETRO_UWP
-        if (!usingCWD)
-            sprintf(buffer, "%s/%sSGame.bin", redirectSave ? modsPath : getResourcesPath(), savePath);
-        else
-            sprintf(buffer, "%s%sSGame.bin", redirectSave ? modsPath : gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-        sprintf(buffer, "%s/%sSGame.bin", redirectSave ? modsPath : gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_iOS
-        sprintf(buffer, "%s/%sSGame.bin", redirectSave ? modsPath : getDocumentsPath(), savePath);
-#else
-        sprintf(buffer, "%s%sSGame.bin", redirectSave ? modsPath : gamePath, savePath);
-#endif
-#else
-#if RETRO_PLATFORM == RETRO_UWP
-        if (!usingCWD)
-            sprintf(buffer, "%s/%sSGame.bin", getResourcesPath(), savePath);
-        else
-            sprintf(buffer, "%s%sSGame.bin", gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-        sprintf(buffer, "%s/%sSGame.bin", gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_iOS
-        sprintf(buffer, "%s/%sSGame.bin", getDocumentsPath(), savePath);
-#else
-        sprintf(buffer, "%s%sSGame.bin", gamePath, savePath);
-#endif
-#endif
-
-        saveFile = fOpen(buffer, "rb");
-        if (!saveFile)
-            return false;
-        useSGame = true;
-    }
-    fRead(saveRAM, sizeof(int), SAVEDATA_SIZE, saveFile);
-    fClose(saveFile);
-    return true;
-}
-
-bool WriteSaveRAMData()
-{
-    char buffer[0x180];
-
-    if (!useSGame) {
-#if RETRO_USE_MOD_LOADER
-#if RETRO_PLATFORM == RETRO_UWP
-        if (!usingCWD)
-            sprintf(buffer, "%s/%sSData.bin", redirectSave ? modsPath : getResourcesPath(), savePath);
-        else
-            sprintf(buffer, "%s%sSData.bin", redirectSave ? modsPath : gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-        sprintf(buffer, "%s/%sSData.bin", redirectSave ? modsPath : gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_iOS
-        sprintf(buffer, "%s/%sSData.bin", redirectSave ? modsPath : getDocumentsPath(), savePath);
-#else
-        sprintf(buffer, "%s%sSData.bin", redirectSave ? modsPath : gamePath, savePath);
-#endif
-#else
-#if RETRO_PLATFORM == RETRO_UWP
-        if (!usingCWD)
-            sprintf(buffer, "%s/%sSData.bin", getResourcesPath(), savePath);
-        else
-            sprintf(buffer, "%s%sSData.bin", gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-        sprintf(buffer, "%s/%sSData.bin", gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_iOS
-        sprintf(buffer, "%s/%sSData.bin", getDocumentsPath(), savePath);
-#else
-        sprintf(buffer, "%s%sSData.bin", gamePath, savePath);
-#endif
-#endif
-    }
-    else {
-#if RETRO_USE_MOD_LOADER
-#if RETRO_PLATFORM == RETRO_UWP
-        if (!usingCWD)
-            sprintf(buffer, "%s/%sSGame.bin", redirectSave ? modsPath : getResourcesPath(), savePath);
-        else
-            sprintf(buffer, "%s%sSGame.bin", redirectSave ? modsPath : gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-        sprintf(buffer, "%s/%sSGame.bin", redirectSave ? modsPath : gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_iOS
-        sprintf(buffer, "%s/%sSGame.bin", redirectSave ? modsPath : getDocumentsPath(), savePath);
-#else
-        sprintf(buffer, "%s%sSGame.bin", redirectSave ? modsPath : gamePath, savePath);
-#endif
-#else
-#if RETRO_PLATFORM == RETRO_UWP
-        if (!usingCWD)
-            sprintf(buffer, "%s/%sSGame.bin", getResourcesPath(), savePath);
-        else
-            sprintf(buffer, "%s%sSGame.bin", gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-        sprintf(buffer, "%s/%sSGame.bin", gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_iOS
-        sprintf(buffer, "%s/%sSGame.bin", getDocumentsPath(), savePath);
-#else
-        sprintf(buffer, "%s%sSGame.bin", gamePath, savePath);
-#endif
-#endif
-    }
-
-    FileIO *saveFile = fOpen(buffer, "wb");
-    if (!saveFile)
-        return false;
-    fWrite(saveRAM, sizeof(int), SAVEDATA_SIZE, saveFile);
-    fClose(saveFile);
-    return true;
-}
+bool skipStartMenu = false;
 
 void InitUserdata()
 {
     // userdata files are loaded from this directory
     sprintf(gamePath, "%s", BASE_PATH);
-#if RETRO_USE_MOD_LOADER
-    sprintf(modsPath, "%s", BASE_PATH);
-#endif
-
-#if RETRO_PLATFORM == RETRO_OSX
-    sprintf(gamePath, "%s/RSDKv4", getResourcesPath());
-    sprintf(modsPath, "%s/RSDKv4/", getResourcesPath());
-
-    mkdir(gamePath, 0777);
-#elif RETRO_PLATFORM == RETRO_ANDROID
-    {
-        char buffer[0x200];
-
-        JNIEnv *env      = (JNIEnv *)SDL_AndroidGetJNIEnv();
-        jobject activity = (jobject)SDL_AndroidGetActivity();
-        jclass cls(env->GetObjectClass(activity));
-        jmethodID method = env->GetMethodID(cls, "getBasePath", "()Ljava/lang/String;");
-        auto ret         = env->CallObjectMethod(activity, method);
-
-        strcpy(buffer, env->GetStringUTFChars((jstring)ret, NULL));
-
-        sprintf(gamePath, "%s", buffer);
-#if RETRO_USE_MOD_LOADER
-        sprintf(modsPath, "%s", buffer);
-#endif
-
-        env->DeleteLocalRef(activity);
-        env->DeleteLocalRef(cls);
-    }
-#endif
 
     char buffer[0x100];
-#if RETRO_PLATFORM == RETRO_UWP
+#if RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_UWP
     if (!usingCWD)
         sprintf(buffer, "%s/settings.ini", getResourcesPath());
     else
         sprintf(buffer, "%ssettings.ini", gamePath);
-#elif RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_ANDROID
-    sprintf(buffer, "%s/settings.ini", gamePath);
 #else
     sprintf(buffer, BASE_PATH "settings.ini");
 #endif
@@ -237,55 +43,23 @@ void InitUserdata()
 
         ini.SetBool("Dev", "DevMenu", Engine.devMenu = false);
         ini.SetBool("Dev", "EngineDebugMode", engineDebugMode = false);
-        ini.SetBool("Dev", "TxtScripts", forceUseScripts = false);
-        forceUseScripts_Config = forceUseScripts;
         ini.SetInteger("Dev", "StartingCategory", Engine.startList = 255);
         ini.SetInteger("Dev", "StartingScene", Engine.startStage = 255);
         ini.SetInteger("Dev", "StartingPlayer", Engine.startPlayer = 255);
         ini.SetInteger("Dev", "StartingSaveFile", Engine.startSave = 255);
         ini.SetInteger("Dev", "FastForwardSpeed", Engine.fastForwardSpeed = 8);
-        Engine.startList_Game  = Engine.startList;
-        Engine.startStage_Game = Engine.startStage;
-
         ini.SetBool("Dev", "UseHQModes", Engine.useHQModes = true);
-        ini.SetString("Dev", "DataFile", (char *)"Data.rsdk");
-        StrCopy(Engine.dataFile[0], "Data.rsdk");
-        if (!StrComp(Engine.dataFile[1], "")) {
-            ini.SetString("Dev", "DataFile2", (char *)"Data2.rsdk");
-            StrCopy(Engine.dataFile[1], "Data2.rsdk");
-        }
-        if (!StrComp(Engine.dataFile[2], "")) {
-            ini.SetString("Dev", "DataFile3", (char *)"Data3.rsdk");
-            StrCopy(Engine.dataFile[2], "Data3.rsdk");
-        }
-        if (!StrComp(Engine.dataFile[3], "")) {
-            ini.SetString("Dev", "DataFile4", (char *)"Data4.rsdk");
-            StrCopy(Engine.dataFile[3], "Data4.rsdk");
-        }
 
         ini.SetInteger("Game", "Language", Engine.language = RETRO_EN);
-        ini.SetInteger("Game", "GameType", Engine.gameTypeID = 0);
-        ini.SetBool("Game", "SkipStartMenu", skipStartMenu = false);
-        skipStartMenu_Config = skipStartMenu;
-        ini.SetInteger("Game", "DisableFocusPause", disableFocusPause = 0);
-        disableFocusPause_Config = disableFocusPause;
-
-#if RETRO_USE_NETWORKING
-        ini.SetString("Network", "Host", (char *)"127.0.0.1");
-        StrCopy(networkHost, "127.0.0.1");
-        ini.SetInteger("Network", "Port", networkPort = 50);
-#endif
+        ini.SetInteger("Game", "SkipStartMenu", skipStartMenu = false);
 
         ini.SetBool("Window", "FullScreen", Engine.startFullScreen = DEFAULT_FULLSCREEN);
         ini.SetBool("Window", "Borderless", Engine.borderless = false);
         ini.SetBool("Window", "VSync", Engine.vsync = false);
-        ini.SetInteger("Window", "ScalingMode", Engine.scalingMode = 0);
+        ini.SetInteger("Window", "ScalingMode", Engine.scalingMode = RETRO_DEFAULTSCALINGMODE);
         ini.SetInteger("Window", "WindowScale", Engine.windowScale = 2);
-        ini.SetInteger("Window", "ScreenWidth", SCREEN_XSIZE_CONFIG = DEFAULT_SCREEN_XSIZE);
-        SCREEN_XSIZE = SCREEN_XSIZE_CONFIG;
+        ini.SetInteger("Window", "ScreenWidth", SCREEN_XSIZE = DEFAULT_SCREEN_XSIZE);
         ini.SetInteger("Window", "RefreshRate", Engine.refreshRate = 60);
-        ini.SetInteger("Window", "DimLimit", Engine.dimLimit = 300);
-        Engine.dimLimit *= Engine.refreshRate;
 
         ini.SetFloat("Audio", "BGMVolume", bgmVolume / (float)MAX_VOLUME);
         ini.SetFloat("Audio", "SFXVolume", sfxVolume / (float)MAX_VOLUME);
@@ -320,11 +94,6 @@ void InitUserdata()
         ini.SetInteger("Controller 1", "R", inputDevice[INPUT_BUTTONR].contMappings = SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
         ini.SetInteger("Controller 1", "Start", inputDevice[INPUT_START].contMappings = SDL_CONTROLLER_BUTTON_START);
         ini.SetInteger("Controller 1", "Select", inputDevice[INPUT_SELECT].contMappings = SDL_CONTROLLER_BUTTON_GUIDE);
-
-        ini.SetFloat("Controller 1", "LStickDeadzone", LSTICK_DEADZONE = 0.3);
-        ini.SetFloat("Controller 1", "RStickDeadzone", RSTICK_DEADZONE = 0.3);
-        ini.SetFloat("Controller 1", "LTriggerDeadzone", LTRIGGER_DEADZONE = 0.3);
-        ini.SetFloat("Controller 1", "RTriggerDeadzone", RTRIGGER_DEADZONE = 0.3);
 #endif
 
 #if RETRO_USING_SDL1
@@ -357,26 +126,21 @@ void InitUserdata()
         ini.SetInteger("Controller 1", "R", inputDevice[INPUT_BUTTONR].contMappings = 13);
         ini.SetInteger("Controller 1", "Start", inputDevice[INPUT_START].contMappings = 8);
         ini.SetInteger("Controller 1", "Select", inputDevice[INPUT_SELECT].contMappings = 14);
-
-        ini.SetFloat("Controller 1", "LStickDeadzone", LSTICK_DEADZONE = 0.3);
-        ini.SetFloat("Controller 1", "RStickDeadzone", RSTICK_DEADZONE = 0.3);
-        ini.SetFloat("Controller 1", "LTriggerDeadzone", LTRIGGER_DEADZONE = 0.3);
-        ini.SetFloat("Controller 1", "RTriggerDeadzone", RTRIGGER_DEADZONE = 0.3);
 #endif
 
-        ini.Write(buffer);
+        StrCopy(Engine.dataFile, "Data.rsdk");
+        ini.SetString("Dev", "DataFile", Engine.dataFile);
+
+        ini.Write(BASE_PATH "settings.ini");
     }
     else {
         fClose(file);
-        IniParser ini(buffer, false);
+        IniParser ini(BASE_PATH "settings.ini");
 
         if (!ini.GetBool("Dev", "DevMenu", &Engine.devMenu))
             Engine.devMenu = false;
         if (!ini.GetBool("Dev", "EngineDebugMode", &engineDebugMode))
             engineDebugMode = false;
-        if (!ini.GetBool("Dev", "TxtScripts", &forceUseScripts))
-            forceUseScripts = false;
-        forceUseScripts_Config = forceUseScripts;
         if (!ini.GetInteger("Dev", "StartingCategory", &Engine.startList))
             Engine.startList = 255;
         if (!ini.GetInteger("Dev", "StartingScene", &Engine.startStage))
@@ -390,43 +154,13 @@ void InitUserdata()
         if (!ini.GetBool("Dev", "UseHQModes", &Engine.useHQModes))
             Engine.useHQModes = true;
 
-        Engine.startList_Game  = Engine.startList;
-        Engine.startStage_Game = Engine.startStage;
-
-        if (!ini.GetString("Dev", "DataFile", Engine.dataFile[0]))
-            StrCopy(Engine.dataFile[0], "Data.rsdk");
-        if (!StrComp(Engine.dataFile[1], "")) {
-            if (!ini.GetString("Dev", "DataFile2", Engine.dataFile[1]))
-                StrCopy(Engine.dataFile[1], "");
-        }
-        if (!StrComp(Engine.dataFile[2], "")) {
-            if (!ini.GetString("Dev", "DataFile3", Engine.dataFile[2]))
-                StrCopy(Engine.dataFile[2], "");
-        }
-        if (!StrComp(Engine.dataFile[3], "")) {
-            if (!ini.GetString("Dev", "DataFile4", Engine.dataFile[3]))
-                StrCopy(Engine.dataFile[3], "");
-        }
+        if (!ini.GetString("Dev", "DataFile", Engine.dataFile))
+            StrCopy(Engine.dataFile, "Data.rsdk");
+        if (!ini.GetBool("Game", "SkipStartMenu", &skipStartMenu))
+            skipStartMenu = false;
 
         if (!ini.GetInteger("Game", "Language", &Engine.language))
             Engine.language = RETRO_EN;
-        if (!ini.GetInteger("Game", "GameType", &Engine.gameTypeID))
-            Engine.gameTypeID = 0;
-        Engine.releaseType = Engine.gameTypeID ? "USE_ORIGINS" : "USE_STANDALONE";
-
-        if (!ini.GetBool("Game", "SkipStartMenu", &skipStartMenu))
-            skipStartMenu = false;
-        skipStartMenu_Config = skipStartMenu;
-        if (!ini.GetInteger("Game", "DisableFocusPause", &disableFocusPause))
-            disableFocusPause = false;
-        disableFocusPause_Config = disableFocusPause;
-
-#if RETRO_USE_NETWORKING
-        if (!ini.GetString("Network", "Host", networkHost))
-            StrCopy(networkHost, "127.0.0.1");
-        if (!ini.GetInteger("Network", "Port", &networkPort))
-            networkPort = 50;
-#endif
 
         if (!ini.GetBool("Window", "FullScreen", &Engine.startFullScreen))
             Engine.startFullScreen = DEFAULT_FULLSCREEN;
@@ -435,18 +169,13 @@ void InitUserdata()
         if (!ini.GetBool("Window", "VSync", &Engine.vsync))
             Engine.vsync = false;
         if (!ini.GetInteger("Window", "ScalingMode", &Engine.scalingMode))
-            Engine.scalingMode = 0;
+            Engine.scalingMode = RETRO_DEFAULTSCALINGMODE;
         if (!ini.GetInteger("Window", "WindowScale", &Engine.windowScale))
             Engine.windowScale = 2;
-        if (!ini.GetInteger("Window", "ScreenWidth", &SCREEN_XSIZE_CONFIG))
-            SCREEN_XSIZE_CONFIG = DEFAULT_SCREEN_XSIZE;
-        SCREEN_XSIZE = SCREEN_XSIZE_CONFIG;
+        if (!ini.GetInteger("Window", "ScreenWidth", &SCREEN_XSIZE))
+            SCREEN_XSIZE = DEFAULT_SCREEN_XSIZE;
         if (!ini.GetInteger("Window", "RefreshRate", &Engine.refreshRate))
             Engine.refreshRate = 60;
-        if (!ini.GetInteger("Window", "DimLimit", &Engine.dimLimit))
-            Engine.dimLimit = 300; // 5 mins
-        if (Engine.dimLimit >= 0)
-            Engine.dimLimit *= Engine.refreshRate;
 
         float bv = 0, sv = 0;
         if (!ini.GetFloat("Audio", "BGMVolume", &bv))
@@ -526,14 +255,7 @@ void InitUserdata()
         if (!ini.GetInteger("Controller 1", "Select", &inputDevice[INPUT_SELECT].contMappings))
             inputDevice[INPUT_SELECT].contMappings = SDL_CONTROLLER_BUTTON_GUIDE;
 
-        if (!ini.GetFloat("Controller 1", "LStickDeadzone", &LSTICK_DEADZONE))
-            LSTICK_DEADZONE = 0.3;
-        if (!ini.GetFloat("Controller 1", "RStickDeadzone", &RSTICK_DEADZONE))
-            RSTICK_DEADZONE = 0.3;
-        if (!ini.GetFloat("Controller 1", "LTriggerDeadzone", &LTRIGGER_DEADZONE))
-            LTRIGGER_DEADZONE = 0.3;
-        if (!ini.GetFloat("Controller 1", "RTriggerDeadzone", &RTRIGGER_DEADZONE))
-            RTRIGGER_DEADZONE = 0.3;
+            // we don't need to autoset deadzones: they're already autoset
 #endif
 
 #if RETRO_USING_SDL1
@@ -594,27 +316,18 @@ void InitUserdata()
             inputDevice[INPUT_START].contMappings = 13;
         if (!ini.GetInteger("Controller 1", "Select", &inputDevice[INPUT_SELECT].contMappings))
             inputDevice[INPUT_SELECT].contMappings = 14;
-
-        if (!ini.GetFloat("Controller 1", "LStickDeadzone", &LSTICK_DEADZONE))
-            LSTICK_DEADZONE = 0.3;
-        if (!ini.GetFloat("Controller 1", "RStickDeadzone", &RSTICK_DEADZONE))
-            RSTICK_DEADZONE = 0.3;
-        if (!ini.GetFloat("Controller 1", "LTriggerDeadzone", &LTRIGGER_DEADZONE))
-            LTRIGGER_DEADZONE = 0.3;
-        if (!ini.GetFloat("Controller 1", "RTriggerDeadzone", &RTRIGGER_DEADZONE))
-            RTRIGGER_DEADZONE = 0.3;
 #endif
     }
 
+    SetScreenSize(SCREEN_XSIZE, SCREEN_YSIZE);
+
 #if RETRO_USING_SDL2
     // Support for extra controller types SDL doesn't recognise
-#if RETRO_PLATFORM == RETRO_UWP
+#if RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_UWP
     if (!usingCWD)
         sprintf(buffer, "%s/controllerdb.txt", getResourcesPath());
     else
         sprintf(buffer, "%scontrollerdb.txt", gamePath);
-#elif RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_ANDROID
-    sprintf(buffer, "%s/controllerdb.txt", gamePath);
 #else
     sprintf(buffer, BASE_PATH "controllerdb.txt");
 #endif
@@ -624,17 +337,15 @@ void InitUserdata()
 
         int nummaps = SDL_GameControllerAddMappingsFromFile(buffer);
         if (nummaps >= 0)
-            PrintLog("loaded %d controller mappings from '%s'", nummaps, buffer);
+            printLog("loaded %d controller mappings from '%s'\n", buffer, nummaps);
     }
 #endif
 
-#if RETRO_PLATFORM == RETRO_UWP
+#if RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_UWP
     if (!usingCWD)
         sprintf(buffer, "%s/UData.bin", getResourcesPath());
     else
         sprintf(buffer, "%sUData.bin", gamePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-    sprintf(buffer, "%s/UData.bin", gamePath);
 #else
     sprintf(buffer, "%sUData.bin", gamePath);
 #endif
@@ -648,7 +359,7 @@ void InitUserdata()
     }
 }
 
-void WriteSettings()
+void writeSettings()
 {
     IniParser ini;
 
@@ -657,8 +368,6 @@ void WriteSettings()
     ini.SetComment("Dev", "DebugModeComment",
                    "Enable this flag to activate features used for debugging the engine (may result in slightly slower game speed)");
     ini.SetBool("Dev", "EngineDebugMode", engineDebugMode);
-    ini.SetComment("Dev", "ScriptsComment", "Enable this flag to force the engine to load from the scripts folder instead of from bytecode");
-    ini.SetBool("Dev", "TxtScripts", forceUseScripts_Config);
     ini.SetComment("Dev", "SCComment", "Sets the starting category ID");
     ini.SetInteger("Dev", "StartingCategory", Engine.startList);
     ini.SetComment("Dev", "SSComment", "Sets the starting scene ID");
@@ -674,67 +383,39 @@ void WriteSettings()
         "Determines if applicable rendering modes (such as 3D floor from special stages) will render in \"High Quality\" mode or standard mode");
     ini.SetBool("Dev", "UseHQModes", Engine.useHQModes);
 
-    ini.SetComment("Dev", "DataFileComment", "Determines where the first RSDK file will be loaded from");
-    ini.SetString("Dev", "DataFile", Engine.dataFile[0]);
-    if (!StrComp(Engine.dataFile[1], "")) {
-        ini.SetComment("Dev", "DataFileComment2", "Determines where the second RSDK file will be loaded from");
-        ini.SetString("Dev", "DataFile2", Engine.dataFile[1]);
-    }
-    if (!StrComp(Engine.dataFile[2], "")) {
-        ini.SetComment("Dev", "DataFileComment3", "Determines where the third RSDK file will be loaded from (normally unused)");
-        ini.SetString("Dev", "DataFile3", Engine.dataFile[2]);
-    }
-    if (!StrComp(Engine.dataFile[3], "")) {
-        ini.SetComment("Dev", "DataFileComment4", "Determines where the fourth RSDK file will be loaded from (normally unused)");
-        ini.SetString("Dev", "DataFile4", Engine.dataFile[3]);
-    }
+    ini.SetComment("Dev", "DataFileComment", "Determines what RSDK file will be loaded");
+    ini.SetString("Dev", "DataFile", Engine.dataFile);
 
     ini.SetComment("Game", "LangComment",
                    "Sets the game language (0 = EN, 1 = FR, 2 = IT, 3 = DE, 4 = ES, 5 = JP, 6 = PT, 7 = RU, 8 = KO, 9 = ZH, 10 = ZS)");
     ini.SetInteger("Game", "Language", Engine.language);
-    ini.SetComment("Game", "GameTypeComment", "Determines game type in scripts (0 = Standalone/Original releases, 1 = Origins release)");
-    ini.SetInteger("Game", "GameType", Engine.gameTypeID);
-    ini.SetComment("Game", "SSMenuComment", "If set to true, disables the start menu");
-    ini.SetBool("Game", "SkipStartMenu", skipStartMenu_Config);
-    ini.SetComment("Game", "DFPMenuComment",
-                   "Handles pausing behaviour when focus is lost\n; 0 = Game focus enabled, engine focus enabled\n; 1 = Game focus disabled, "
-                   "engine focus enabled\n; 2 = Game focus enabled, engine focus disabled\n; 3 = Game focus disabled, engine focus disabled");
-    ini.SetInteger("Game", "DisableFocusPause", disableFocusPause_Config);
-
-#if RETRO_USE_NETWORKING
-    ini.SetComment("Network", "HostComment", "The host (IP address or \"URL\") that the game will try to connect to.");
-    ini.SetString("Network", "Host", networkHost);
-    ini.SetComment("Network", "PortComment", "The port the game will try to connect to.");
-    ini.SetInteger("Network", "Port", networkPort);
-#endif
+    ini.SetComment("Game", "SSMenuComment", "if set to true, disables the start menu");
+    ini.SetBool("Game", "SkipStartMenu", skipStartMenu);
 
     ini.SetComment("Window", "FSComment", "Determines if the window will be fullscreen or not");
     ini.SetBool("Window", "FullScreen", Engine.startFullScreen);
     ini.SetComment("Window", "BLComment", "Determines if the window will be borderless or not");
     ini.SetBool("Window", "Borderless", Engine.borderless);
-    ini.SetComment("Window", "VSComment",
-                   "Determines if VSync will be active or not (not recommended as the engine is built around running at 60 FPS)");
+    ini.SetComment("Window", "VSComment", "Determines if VSync will be active or not");
     ini.SetBool("Window", "VSync", Engine.vsync);
-    ini.SetComment("Window", "SMComment", "Determines what scaling is used. 0 is nearest neighbour, 1 is linear.");
+    ini.SetComment("Window", "SMComment", "Determines what scaling is used. 0 is nearest neighbour, 1 is integer scale, 2 is sharp bilinear, and 3 is regular bilinear.");
+    ini.SetComment("Window", "SMWarning", "Note: Not all scaling options work correctly on certain platforms, as they don't support bilinear filtering.");
     ini.SetInteger("Window", "ScalingMode", Engine.scalingMode);
     ini.SetComment("Window", "WSComment", "How big the window will be");
     ini.SetInteger("Window", "WindowScale", Engine.windowScale);
     ini.SetComment("Window", "SWComment", "How wide the base screen will be in pixels");
-    ini.SetInteger("Window", "ScreenWidth", SCREEN_XSIZE_CONFIG);
+    ini.SetInteger("Window", "ScreenWidth", SCREEN_XSIZE);
     ini.SetComment("Window", "RRComment", "Determines the target FPS");
     ini.SetInteger("Window", "RefreshRate", Engine.refreshRate);
-    ini.SetComment("Window", "DLComment", "Determines the dim timer in seconds, set to -1 to disable dimming");
-    ini.SetInteger("Window", "DimLimit", Engine.dimLimit >= 0 ? Engine.dimLimit / Engine.refreshRate : -1);
 
     ini.SetFloat("Audio", "BGMVolume", bgmVolume / (float)MAX_VOLUME);
     ini.SetFloat("Audio", "SFXVolume", sfxVolume / (float)MAX_VOLUME);
 
 #if RETRO_USING_SDL2
-    ini.SetComment("Keyboard 1", "IK1Comment",
-                   "Keyboard Mappings for P1 (Based on: https://wiki.libsdl.org/SDL2/SDL_Scancode)");
+    ini.SetComment("Keyboard 1", "IK1Comment", "Keyboard Mappings for P1 (Based on: https://wiki.libsdl.org/SDL_Scancode)");
 #endif
 #if RETRO_USING_SDL1
-    ini.SetComment("Keyboard 1", "IK1Comment", "Keyboard Mappings for P1 (Based on: https://www.libsdl.org/release/SDL-1.2.15/docs/html/sdlkey.html)");
+    ini.SetComment("Keyboard 1", "IK1Comment", "Keyboard Mappings for P1 (Based on: https://wiki.libsdl.org/SDLKeycodeLookup)");
 #endif
     ini.SetInteger("Keyboard 1", "Up", inputDevice[INPUT_UP].keyMappings);
     ini.SetInteger("Keyboard 1", "Down", inputDevice[INPUT_DOWN].keyMappings);
@@ -752,11 +433,18 @@ void WriteSettings()
     ini.SetInteger("Keyboard 1", "Select", inputDevice[INPUT_SELECT].keyMappings);
 
 #if RETRO_USING_SDL2
-    ini.SetComment("Controller 1", "IC1Comment",
-                   "Controller Mappings for P1 (Based on: https://rsdkmodding.com/RSDKv4/Decompilation/SettingsINI/#controller-buttons)");
-#else
-    ini.SetComment("Controller 1", "IC1Comment",
-                   "Controller Mappings for P1");
+    ini.SetComment("Controller 1", "IC1Comment", "Controller Mappings for P1 (Based on: https://wiki.libsdl.org/SDL_GameControllerButton)");
+    ini.SetComment("Controller 1", "IC1Comment2", "Extra buttons can be mapped with the following IDs:");
+    ini.SetComment("Controller 1", "IC1Comment3", "CONTROLLER_BUTTON_ZL             = 16");
+    ini.SetComment("Controller 1", "IC1Comment4", "CONTROLLER_BUTTON_ZR             = 17");
+    ini.SetComment("Controller 1", "IC1Comment5", "CONTROLLER_BUTTON_LSTICK_UP      = 18");
+    ini.SetComment("Controller 1", "IC1Comment6", "CONTROLLER_BUTTON_LSTICK_DOWN    = 19");
+    ini.SetComment("Controller 1", "IC1Comment7", "CONTROLLER_BUTTON_LSTICK_LEFT    = 20");
+    ini.SetComment("Controller 1", "IC1Comment8", "CONTROLLER_BUTTON_LSTICK_RIGHT   = 21");
+    ini.SetComment("Controller 1", "IC1Comment9", "CONTROLLER_BUTTON_RSTICK_UP      = 22");
+    ini.SetComment("Controller 1", "IC1Comment10", "CONTROLLER_BUTTON_RSTICK_DOWN    = 23");
+    ini.SetComment("Controller 1", "IC1Comment11", "CONTROLLER_BUTTON_RSTICK_LEFT    = 24");
+    ini.SetComment("Controller 1", "IC1Comment12", "CONTROLLER_BUTTON_RSTICK_RIGHT   = 25");
 #endif
     ini.SetInteger("Controller 1", "Up", inputDevice[INPUT_UP].contMappings);
     ini.SetInteger("Controller 1", "Down", inputDevice[INPUT_DOWN].contMappings);
@@ -772,73 +460,37 @@ void WriteSettings()
     ini.SetInteger("Controller 1", "R", inputDevice[INPUT_BUTTONR].contMappings);
     ini.SetInteger("Controller 1", "Start", inputDevice[INPUT_START].contMappings);
     ini.SetInteger("Controller 1", "Select", inputDevice[INPUT_SELECT].contMappings);
+    ini.SetInteger("Controller 1", "LStickDeadzone", LSTICK_DEADZONE);
+    ini.SetInteger("Controller 1", "RStickDeadzone", RSTICK_DEADZONE);
+    ini.SetInteger("Controller 1", "LTriggerDeadzone", LTRIGGER_DEADZONE);
+    ini.SetInteger("Controller 1", "RTriggerDeadzone", RTRIGGER_DEADZONE);
 
-    ini.SetComment("Controller 1", "DeadZoneComment", "Deadzones, 0.0-1.0");
-    ini.SetFloat("Controller 1", "LStickDeadzone", LSTICK_DEADZONE);
-    ini.SetFloat("Controller 1", "RStickDeadzone", RSTICK_DEADZONE);
-    ini.SetFloat("Controller 1", "LTriggerDeadzone", LTRIGGER_DEADZONE);
-    ini.SetFloat("Controller 1", "RTriggerDeadzone", RTRIGGER_DEADZONE);
-
-    char buffer[0x100];
-
-#if RETRO_PLATFORM == RETRO_UWP
-    if (!usingCWD)
-        sprintf(buffer, "%s/settings.ini", getResourcesPath());
-    else
-        sprintf(buffer, "%ssettings.ini", gamePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-    sprintf(buffer, "%s/settings.ini", gamePath);
-#else
-    sprintf(buffer, "%ssettings.ini", gamePath);
-#endif
-
-    ini.Write(buffer, false);
+    ini.Write(BASE_PATH "settings.ini");
 }
 
 void ReadUserdata()
 {
     char buffer[0x100];
-#if RETRO_USE_MOD_LOADER
-#if RETRO_PLATFORM == RETRO_UWP
+#if RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_UWP
     if (!usingCWD)
-        sprintf(buffer, "%s/%sUData.bin", redirectSave ? modsPath : getResourcesPath(), savePath);
+        sprintf(buffer, "%s/UData.bin", getResourcesPath());
     else
-        sprintf(buffer, "%s%sUData.bin", redirectSave ? modsPath : gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-    sprintf(buffer, "%s/%sUData.bin", redirectSave ? modsPath : gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_iOS
-    sprintf(buffer, "%s/%sUData.bin", redirectSave ? modsPath : getDocumentsPath(), savePath);
+        sprintf(buffer, "%sUData.bin", gamePath);
 #else
-    sprintf(buffer, "%s%sUData.bin", redirectSave ? modsPath : gamePath, savePath);
-#endif
-#else
-#if RETRO_PLATFORM == RETRO_UWP
-    if (!usingCWD)
-        sprintf(buffer, "%s/%sUData.bin", getResourcesPath(), savePath);
-    else
-        sprintf(buffer, "%s%sUData.bin", gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-    sprintf(buffer, "%s/%sUData.bin", gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_iOS
-    sprintf(buffer, "%s/%sUData.bin", getDocumentsPath(), savePath);
-#else
-    sprintf(buffer, "%s%sUData.bin", gamePath, savePath);
-#endif
+    sprintf(buffer, "%sUData.bin", gamePath);
 #endif
     FileIO *userFile = fOpen(buffer, "rb");
     if (!userFile)
         return;
 
     int buf = 0;
-    for (int a = 0; a < ACHIEVEMENT_COUNT; ++a) {
+    for (int a = 0; a < ACHIEVEMENT_MAX; ++a) {
         fRead(&buf, 4, 1, userFile);
         achievements[a].status = buf;
     }
-    for (int l = 0; l < LEADERBOARD_COUNT; ++l) {
+    for (int l = 0; l < LEADERBOARD_MAX; ++l) {
         fRead(&buf, 4, 1, userFile);
-        leaderboards[l].score = buf;
-        if (!leaderboards[l].score)
-            leaderboards[l].score = 0x7FFFFFF;
+        leaderboard[l].status = buf;
     }
 
     fClose(userFile);
@@ -851,40 +503,20 @@ void ReadUserdata()
 void WriteUserdata()
 {
     char buffer[0x100];
-#if RETRO_USE_MOD_LOADER
-#if RETRO_PLATFORM == RETRO_UWP
+#if RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_UWP
     if (!usingCWD)
-        sprintf(buffer, "%s/%sUData.bin", redirectSave ? modsPath : getResourcesPath(), savePath);
+        sprintf(buffer, "%s/UData.bin", getResourcesPath());
     else
-        sprintf(buffer, "%s%sUData.bin", redirectSave ? modsPath : gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-    sprintf(buffer, "%s/%sUData.bin", redirectSave ? modsPath : gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_iOS
-    sprintf(buffer, "%s/%sUData.bin", redirectSave ? modsPath : getDocumentsPath(), savePath);
+        sprintf(buffer, "%sUData.bin", gamePath);
 #else
-    sprintf(buffer, "%s%sUData.bin", redirectSave ? modsPath : gamePath, savePath);
+    sprintf(buffer, "%sUData.bin", gamePath);
 #endif
-#else
-#if RETRO_PLATFORM == RETRO_UWP
-    if (!usingCWD)
-        sprintf(buffer, "%s/%sUData.bin", getResourcesPath(), savePath);
-    else
-        sprintf(buffer, "%s%sUData.bin", gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_OSX
-    sprintf(buffer, "%s/%sUData.bin", gamePath, savePath);
-#elif RETRO_PLATFORM == RETRO_iOS
-    sprintf(buffer, "%s/%sUData.bin", getDocumentsPath(), savePath);
-#else
-    sprintf(buffer, "%s%sUData.bin", gamePath, savePath);
-#endif
-#endif
-
     FileIO *userFile = fOpen(buffer, "wb");
     if (!userFile)
         return;
 
-    for (int a = 0; a < ACHIEVEMENT_COUNT; ++a) fWrite(&achievements[a].status, 4, 1, userFile);
-    for (int l = 0; l < LEADERBOARD_COUNT; ++l) fWrite(&leaderboards[l].score, 4, 1, userFile);
+    for (int a = 0; a < ACHIEVEMENT_MAX; ++a) fWrite(&achievements[a].status, 4, 1, userFile);
+    for (int l = 0; l < LEADERBOARD_MAX; ++l) fWrite(&leaderboard[l].status, 4, 1, userFile);
 
     fClose(userFile);
 
@@ -892,239 +524,189 @@ void WriteUserdata()
         // Load from online
     }
 }
-#endif
 
 void AwardAchievement(int id, int status)
 {
-    if (id < 0 || id >= ACHIEVEMENT_COUNT)
+    if (id < 0 || id >= ACHIEVEMENT_MAX)
         return;
 
     if (status == 100 && status != achievements[id].status)
-        PrintLog("Achieved achievement: %s (%d)!", achievements[id].name, status);
+        printLog("Achieved achievement: %s (%d)!", achievements[id].name, status);
 
     achievements[id].status = status;
 
     if (Engine.onlineActive) {
         // Set Achievement online
     }
-#if !RETRO_USE_ORIGINAL_CODE
     WriteUserdata();
-#endif
 }
 
-void SetAchievement(int *achievementID, int *status)
+int SetAchievement(int achievementID, void *achDone)
 {
+    int achievementDone = static_cast<int>(reinterpret_cast<intptr_t>(achDone));
     if (!Engine.trialMode && !debugMode) {
-        AwardAchievement(*achievementID, *status);
-    }
-}
-#if RETRO_USE_MOD_LOADER
-void AddGameAchievement(int *unused, const char *name) { StrCopy(achievements[achievementCount++].name, name); }
-void SetAchievementDescription(uint *id, const char *desc)
-{
-    if (*id >= achievementCount)
-        return;
-
-    StrCopy(achievements[*id].desc, desc);
-}
-void ClearAchievements() { achievementCount = 0; }
-void GetAchievementCount() { scriptEng.checkResult = achievementCount; }
-void GetAchievementName(uint *id, int *textMenu)
-{
-    if (*id >= achievementCount)
-        return;
-
-    TextMenu *menu                       = &gameMenu[*textMenu];
-    menu->entryHighlight[menu->rowCount] = false;
-    AddTextMenuEntry(menu, achievements[*id].name);
-}
-void GetAchievementDescription(uint *id, int *textMenu)
-{
-    if (*id >= achievementCount)
-        return;
-
-    TextMenu *menu                       = &gameMenu[*textMenu];
-    menu->entryHighlight[menu->rowCount] = false;
-    AddTextMenuEntry(menu, achievements[*id].desc);
-}
-void GetAchievement(uint *id, void *unused)
-{
-    if (*id >= achievementCount)
-        return;
-    scriptEng.checkResult = achievements[*id].status;
-}
-#endif
-void ShowAchievementsScreen()
-{
-#if !RETRO_USE_ORIGINAL_CODE
-    CREATE_ENTITY(AchievementsMenu);
-#endif
-}
-
-int SetLeaderboard(int *leaderboardID, int *score)
-{
-    if (!Engine.trialMode && !debugMode) {
-        // 0  = GHZ1/EHZ1
-        // 1  = GHZ2/EHZ1
-        // 2  = GHZ3/CPZ1
-        // 3  = MZ1/CPZ1
-        // 4  = MZ2/ARZ1
-        // 5  = MZ3/ARZ1
-        // 6  = SYZ1/CNZ1
-        // 7  = SYZ2/CNZ1
-        // 8  = SYZ3/HTZ1
-        // 9  = LZ1/HTZ1
-        // 10 = LZ2/MCZ1
-        // 11 = LZ3/MCZ1
-        // 12 = SLZ1/OOZ1
-        // 13 = SLZ2/OOZ1
-        // 14 = SLZ3/MPZ1
-        // 15 = SBZ1/MPZ2
-        // 15 = SBZ2/MPZ3
-        // 16 = SBZ3/SCZ
-        // 17 = ???/WFZ
-        // 18 = ???/DEZ
-        // 19 = TotalScore (S1)/???
-        // 20 = ???
-        // 21 = HPZ
-        // 22 = TotalScore (S2)
-#if !RETRO_USE_ORIGINAL_CODE
-        if (*score < leaderboards[*leaderboardID].score) {
-            PrintLog("Set leaderboard (%d) value to %d", *leaderboardID, score);
-            leaderboards[*leaderboardID].score = *score;
-            WriteUserdata();
-        }
-        else {
-            PrintLog("Attempted to set leaderboard (%d) value to %d... but score was already %d!", *leaderboardID, *score,
-                     leaderboards[*leaderboardID].score);
-        }
-#endif
+        AwardAchievement(achievementID, achievementDone);
         return 1;
     }
     return 0;
 }
-void ShowLeaderboardsScreen()
+int SetLeaderboard(int leaderboardID, void *res)
 {
-    /*TODO*/
-    PrintLog("we're showing the leaderboards screen");
+    int result = static_cast<int>(reinterpret_cast<intptr_t>(res));
+    if (!Engine.trialMode && !debugMode) {
+        printLog("Set leaderboard (%d) value to %d", leaderboard, result);
+        switch (leaderboardID) {
+            case 0:
+            case 1:
+            case 2:
+            case 3:
+            case 4:
+            case 5:
+            case 6:
+            case 7:
+            case 8:
+            case 9:
+            case 10:
+            case 11:
+            case 12:
+            case 13:
+            case 14:
+            case 15:
+            case 16:
+            case 17:
+            case 18:
+            case 19:
+            case 20:
+            case 21:
+                leaderboard[leaderboardID].status = result;
+                WriteUserdata();
+                return 1;
+        }
+    }
+    return 0;
 }
 
-bool disableFocusPause_Store = false;
-void Connect2PVS(int *gameLength, int *itemMode)
+int Connect2PVS(int gameLength, void *itemMode)
 {
-    PrintLog("Attempting to connect to 2P game (%d) (%d)", *gameLength, *itemMode);
+    printLog("Attempting to connect to 2P game (%d) (%p)", gameLength, itemMode);
 
     multiplayerDataIN.type = 0;
     matchValueData[0]      = 0;
     matchValueData[1]      = 0;
     matchValueReadPos      = 0;
     matchValueWritePos     = 0;
-#if RETRO_USE_NETWORKING
-    Engine.gameMode = ENGINE_CONNECT2PVS;
-#endif
-    // PauseSound();
+    Engine.gameMode        = ENGINE_CONNECT2PVS;
+    PauseSound();
+
     // actual connection code
-    vsGameLength = *gameLength;
-    vsItemMode   = *itemMode;
     if (Engine.onlineActive) {
-#if RETRO_USE_NETWORKING
-        disableFocusPause_Store = disableFocusPause;
-        disableFocusPause       = 3;
-        RunNetwork();
-#endif
+        // Do online code
+        return 1;
     }
+    return 0;
 }
-void Disconnect2PVS()
+int Disconnect2PVS(int a1, void *a2)
 {
-    PrintLog("Attempting to disconnect from 2P game");
+    printLog("Attempting to disconnect from 2P game (%d) (%p)", a1, a2);
 
     if (Engine.onlineActive) {
 #if RETRO_USE_NETWORKING
-        disableFocusPause = disableFocusPause_Store;
-        // Engine.devMenu    = vsPlayerID;
-        vsPlaying = false;
-        DisconnectNetwork();
-        InitNetwork();
+        sendData(0, sizeof(multiplayerDataOUT), &multiplayerDataOUT);
 #endif
+        return 1;
     }
+    return 0;
 }
-void SendEntity(int *entityID, int *verify)
+int SendEntity(int dataSlot, void *entityID)
 {
+    printLog("Attempting to send entity (%d) (%p)", dataSlot, entityID);
+
     if (!sendCounter) {
         multiplayerDataOUT.type = 1;
-        memcpy(multiplayerDataOUT.data, &objectEntityList[*entityID], sizeof(Entity));
+        memcpy(multiplayerDataOUT.data, &objectEntityList[static_cast<int>(reinterpret_cast<intptr_t>(entityID))], sizeof(Entity));
         if (Engine.onlineActive) {
 #if RETRO_USE_NETWORKING
-            SendData(*verify);
+            sendData(0, sizeof(multiplayerDataOUT), &multiplayerDataOUT);
 #endif
+            return 1;
         }
     }
-    sendCounter = (sendCounter + 1) % 2;
+    sendCounter += 1;
+    sendCounter %= 2;
+    return 0;
 }
-void SendValue(int *value, int *verify)
+int SendValue(int a1, void *value)
 {
-    // PrintLog("Attempting to send value (%d) (%d)", *dataSlot, *value);
+    printLog("Attempting to send value (%d) (%p)", a1, value);
 
     multiplayerDataOUT.type    = 0;
-    multiplayerDataOUT.data[0] = *value;
-    if (Engine.onlineActive) {
+    multiplayerDataOUT.data[0] = static_cast<int>(reinterpret_cast<intptr_t>(value));
+    if (Engine.onlineActive && sendDataMethod) {
 #if RETRO_USE_NETWORKING
-        SendData(*verify);
+        sendData(0, sizeof(multiplayerDataOUT), &multiplayerDataOUT);
 #endif
+        return 1;
     }
+    return 0;
 }
-bool receiveReady = false;
-void ReceiveEntity(int *entityID, int *incrementPos)
+int ReceiveEntity(int dataSlotID, void *entityID)
 {
-    // PrintLog("Attempting to receive entity (%d) (%d)", *clearOnReceive, *entityID);
+    printLog("Attempting to receive entity (%d) (%p)", dataSlotID, entityID);
 
-    if (Engine.onlineActive && receiveReady) {
-        // receiveReady = false;
-        if (*incrementPos == 1) {
+    if (Engine.onlineActive) {
+        // Do online code
+        int entitySlot = static_cast<int>(reinterpret_cast<intptr_t>(entityID));
+        if (dataSlotID == 1) {
             if (multiplayerDataIN.type == 1) {
-                memcpy(&objectEntityList[*entityID], multiplayerDataIN.data, sizeof(Entity));
+                memcpy(&objectEntityList[entitySlot], multiplayerDataIN.data, sizeof(Entity));
             }
             multiplayerDataIN.type = 0;
         }
         else {
-            memcpy(&objectEntityList[*entityID], multiplayerDataIN.data, sizeof(Entity));
+            memcpy(&objectEntityList[entitySlot], multiplayerDataIN.data, sizeof(Entity));
         }
     }
+    return 0;
 }
-void ReceiveValue(int *value, int *incrementPos)
+int ReceiveValue(int dataSlot, void *value)
 {
-    // PrintLog("Attempting to receive value (%d) (%d)", *incrementPos, *value);
+    printLog("Attempting to receive value (%d) (%p)", dataSlot, value);
 
-    if (Engine.onlineActive && receiveReady) {
-        // receiveReady = false;
-        if (*incrementPos == 1) {
+    if (Engine.onlineActive) {
+        // Do online code
+        int *val = (int *)value;
+
+        if (dataSlot == 1) {
             if (matchValueReadPos != matchValueWritePos) {
-                *value = matchValueData[matchValueReadPos];
+                *val = matchValueData[matchValueReadPos];
                 matchValueReadPos++;
             }
         }
         else {
-            *value = matchValueData[matchValueReadPos];
+            *val = matchValueData[matchValueReadPos];
         }
+        return 1;
     }
+    return 0;
 }
-void TransmitGlobal(int *globalValue, const char *globalName)
+int TransmitGlobal(int globalValue, void *globalName)
 {
-    PrintLog("Attempting to transmit global (%s) (%d)", globalName, *globalValue);
+    printLog("Attempting to transmit global (%s) (%d)", (char *)globalName, globalValue);
 
     multiplayerDataOUT.type    = 2;
-    multiplayerDataOUT.data[0] = GetGlobalVariableID(globalName);
-    multiplayerDataOUT.data[1] = *globalValue;
-    if (Engine.onlineActive) {
+    multiplayerDataOUT.data[0] = GetGlobalVariableID((char *)globalName);
+    multiplayerDataOUT.data[1] = globalValue;
+    if (Engine.onlineActive && sendDataMethod) {
 #if RETRO_USE_NETWORKING
-        SendData();
+        sendData(0, sizeof(multiplayerDataOUT), &multiplayerDataOUT);
 #endif
+        return 1;
     }
+    return 0;
 }
 
-void Receive2PVSData(MultiplayerData *data)
+void receive2PVSData(MultiplayerData *data)
 {
-    receiveReady = true;
     switch (data->type) {
         case 0: matchValueData[matchValueWritePos++] = data->data[0]; break;
         case 1:
@@ -1135,279 +717,21 @@ void Receive2PVSData(MultiplayerData *data)
     }
 }
 
-void Receive2PVSMatchCode(int code)
+void receive2PVSMatchCode(int code)
 {
-    receiveReady = true;
-    code &= 0x00000FF0;
-    code |= 0x00001000 * vsPlayerID;
     matchValueData[matchValueWritePos++] = code;
     ResumeSound();
-    vsPlayerID = Engine.devMenu;
-    // Engine.devMenu  = false;
     Engine.gameMode = ENGINE_MAINGAME;
-    vsPlaying       = true;
-    ClearNativeObjects();
-    CREATE_ENTITY(RetroGameLoop); // hack
-    if (Engine.gameDeviceType == RETRO_MOBILE)
-        CREATE_ENTITY(VirtualDPad);
-#if RETRO_USE_NETWORKING
-    CREATE_ENTITY(MultiplayerHandler);
+}
+
+int ShowPromoPopup(int a1, void *a2)
+{
+#if RSDK_DEBUG
+    printLog("Attempting to show promo popup (%d) (%p)", a1, a2);
 #endif
-}
-
-void ShowPromoPopup(int *id, const char *popupName) { PrintLog("Attempting to show promo popup: \"%s\" (%d)", popupName, id ? *id : 0); }
-void ShowSegaIDPopup()
-{
-    // nothing here, its just all to a java method of the same name
-}
-void ShowOnlineSignIn()
-{
-    // nothing here, its just all to a java method of the same name
-}
-void ShowWebsite(int websiteID)
-{
-    switch (websiteID) {
-        default: PrintLog("Showing unknown website: (%d)", websiteID); break;
-        case 0: PrintLog("Showing website: \"%s\" (%d)", "http://www.sega.com/mprivacy", websiteID); break;
-        case 1: PrintLog("Showing website: \"%s\" (%d)", "http://www.sega.com/legal", websiteID); break;
+    if (Engine.onlineActive) {
+        // Do online code
+        return 1;
     }
+    return 0;
 }
-
-#if RETRO_REV03
-enum NotifyCallbackIDs {
-    NOTIFY_DEATH_EVENT         = 128,
-    NOTIFY_TOUCH_SIGNPOST      = 129,
-    NOTIFY_HUD_ENABLE          = 130,
-    NOTIFY_ADD_COIN            = 131,
-    NOTIFY_KILL_ENEMY          = 132,
-    NOTIFY_SAVESLOT_SELECT     = 133,
-    NOTIFY_FUTURE_PAST         = 134,
-    NOTIFY_GOTO_FUTURE_PAST    = 135,
-    NOTIFY_BOSS_END            = 136,
-    NOTIFY_SPECIAL_END         = 137,
-    NOTIFY_DEBUGPRINT          = 138,
-    NOTIFY_KILL_BOSS           = 139,
-    NOTIFY_TOUCH_EMERALD       = 140,
-    NOTIFY_STATS_ENEMY         = 141,
-    NOTIFY_STATS_CHARA_ACTION  = 142,
-    NOTIFY_STATS_RING          = 143,
-    NOTIFY_STATS_MOVIE         = 144,
-    NOTIFY_STATS_PARAM_1       = 145,
-    NOTIFY_STATS_PARAM_2       = 146,
-    NOTIFY_CHARACTER_SELECT    = 147,
-    NOTIFY_SPECIAL_RETRY       = 148,
-    NOTIFY_TOUCH_CHECKPOINT    = 149,
-    NOTIFY_ACT_FINISH          = 150,
-    NOTIFY_1P_VS_SELECT        = 151,
-    NOTIFY_CONTROLLER_SUPPORT  = 152,
-    NOTIFY_STAGE_RETRY         = 153,
-    NOTIFY_SOUND_TRACK         = 154,
-    NOTIFY_GOOD_ENDING         = 155,
-    NOTIFY_BACK_TO_MAINMENU    = 156,
-    NOTIFY_LEVEL_SELECT_MENU   = 157,
-    NOTIFY_PLAYER_SET          = 158,
-    NOTIFY_EXTRAS_MODE         = 159,
-    NOTIFY_SPIN_DASH_TYPE      = 160,
-    NOTIFY_TIME_OVER           = 161,
-    NOTIFY_TIMEATTACK_MODE     = 162,
-    NOTIFY_STATS_BREAK_OBJECT  = 163,
-    NOTIFY_STATS_SAVE_FUTURE   = 164,
-    NOTIFY_STATS_CHARA_ACTION2 = 165,
-};
-
-void NotifyCallback(int *callback, int *param1, int *param2, int *param3)
-{
-    if (!callback || !param1)
-        return;
-
-    switch (*callback) {
-        default: PrintLog("NOTIFY: Unknown Callback -> %d", *param1); break;
-        case NOTIFY_DEATH_EVENT: PrintLog("NOTIFY: DeathEvent() -> %d", *param1); break;
-        case NOTIFY_TOUCH_SIGNPOST: PrintLog("NOTIFY: TouchSignPost() -> %d", *param1); break;
-        case NOTIFY_HUD_ENABLE: PrintLog("NOTIFY: HUDEnable() -> %d", *param1); break;
-        case NOTIFY_ADD_COIN:
-            PrintLog("NOTIFY: AddCoin() -> %d", *param1);
-            SetGlobalVariableByName("game.coinCount", GetGlobalVariableByName("game.coinCount") + *param1);
-            break;
-        case NOTIFY_KILL_ENEMY: PrintLog("NOTIFY: KillEnemy() -> %d", *param1); break;
-        case NOTIFY_SAVESLOT_SELECT: PrintLog("NOTIFY: SaveSlotSelect() -> %d", *param1); break;
-        case NOTIFY_FUTURE_PAST: PrintLog("NOTIFY: FuturePast() -> %d", *param1); break;
-        case NOTIFY_GOTO_FUTURE_PAST: PrintLog("NOTIFY: GotoFuturePast() -> %d", *param1); break;
-        case NOTIFY_BOSS_END: PrintLog("NOTIFY: BossEnd() -> %d", *param1); break;
-        case NOTIFY_SPECIAL_END: PrintLog("NOTIFY: SpecialEnd() -> %d", *param1); break;
-        case NOTIFY_DEBUGPRINT:
-            // Although there are instances of this being called from both CallNativeFunction2 and CallNativeFunction4 in Origins' scripts, there's no way we can tell which one was used here to handle possible errors
-            // Due to this, we'll only print param1 regardless of the opcode used
-            PrintLog("NOTIFY: DebugPrint() -> %d", *param1);
-            break;
-        case NOTIFY_KILL_BOSS: PrintLog("NOTIFY: KillBoss() -> %d", *param1); break;
-        case NOTIFY_TOUCH_EMERALD: PrintLog("NOTIFY: TouchEmerald() -> %d", *param1); break;
-        case NOTIFY_STATS_ENEMY: PrintLog("NOTIFY: StatsEnemy() -> %d, %d, %d", *param1, *param2, *param3); break;
-        case NOTIFY_STATS_CHARA_ACTION: PrintLog("NOTIFY: StatsCharaAction() -> %d, %d, %d", *param1, *param2, *param3); break;
-        case NOTIFY_STATS_RING: PrintLog("NOTIFY: StatsRing() -> %d", *param1); break;
-        case NOTIFY_STATS_MOVIE:
-            PrintLog("NOTIFY: StatsMovie() -> %d", *param1);
-            ClearGraphicsData();
-            ClearAnimationData();
-            activeStageList   = 0;
-            stageMode         = STAGEMODE_LOAD;
-            Engine.gameMode   = ENGINE_MAINGAME;
-            stageListPosition = 0;
-            break;
-        case NOTIFY_STATS_PARAM_1: PrintLog("NOTIFY: StatsParam1() -> %d, %d, %d", *param1, *param2, *param3); break;
-        case NOTIFY_STATS_PARAM_2: PrintLog("NOTIFY: StatsParam2() -> %d", *param1); break;
-        case NOTIFY_CHARACTER_SELECT:
-            PrintLog("NOTIFY: CharacterSelect() -> %d", *param1);
-            SetGlobalVariableByName("game.callbackResult", 1);
-            SetGlobalVariableByName("game.continueFlag", 0);
-            break;
-        case NOTIFY_SPECIAL_RETRY:
-            PrintLog("NOTIFY: SpecialRetry() -> %d, %d, %d", *param1, *param2, *param3);
-            SetGlobalVariableByName("game.callbackResult", 1);
-            break;
-        case NOTIFY_TOUCH_CHECKPOINT: PrintLog("NOTIFY: TouchCheckpoint() -> %d", *param1); break;
-        case NOTIFY_ACT_FINISH: PrintLog("NOTIFY: ActFinish() -> %d", *param1); break;
-        case NOTIFY_1P_VS_SELECT: PrintLog("NOTIFY: 1PVSSelect() -> %d", *param1); break;
-        case NOTIFY_CONTROLLER_SUPPORT:
-            PrintLog("NOTIFY: ControllerSupport() -> %d", *param1);
-            SetGlobalVariableByName("game.callbackResult", 1);
-            break;
-        case NOTIFY_STAGE_RETRY: PrintLog("NOTIFY: StageRetry() -> %d", *param1); break;
-        case NOTIFY_SOUND_TRACK: PrintLog("NOTIFY: SoundTrack() -> %d", *param1); break;
-        case NOTIFY_GOOD_ENDING: PrintLog("NOTIFY: GoodEnding() -> %d", *param1); break;
-        case NOTIFY_BACK_TO_MAINMENU: PrintLog("NOTIFY: BackToMainMenu() -> %d", *param1); break;
-        case NOTIFY_LEVEL_SELECT_MENU: PrintLog("NOTIFY: LevelSelectMenu() -> %d", *param1); break;
-        case NOTIFY_PLAYER_SET: PrintLog("NOTIFY: PlayerSet() -> %d", *param1); break;
-        case NOTIFY_EXTRAS_MODE: PrintLog("NOTIFY: ExtrasMode() -> %d", *param1); break;
-        case NOTIFY_SPIN_DASH_TYPE: PrintLog("NOTIFY: SpindashType() -> %d", *param1); break;
-        case NOTIFY_TIME_OVER: PrintLog("NOTIFY: TimeOver() -> %d", *param1); break;
-        case NOTIFY_TIMEATTACK_MODE: PrintLog("NOTIFY: TimeAttackMode() -> %d", *param1); break;
-        case NOTIFY_STATS_BREAK_OBJECT: PrintLog("NOTIFY: StatsBreakObject() -> %d, %d", *param1, *param2); break;
-        case NOTIFY_STATS_SAVE_FUTURE: PrintLog("NOTIFY: StatsSaveFuture() -> %d", *param1); break;
-        case NOTIFY_STATS_CHARA_ACTION2: PrintLog("NOTIFY: StatsCharaAction2() -> %d, %d, %d", *param1, *param2, *param3); break;
-    }
-}
-#endif
-
-void ExitGame() { Engine.running = false; }
-
-void FileExists(int *unused, const char *filePath)
-{
-    FileInfo info;
-    scriptEng.checkResult = false;
-    if (LoadFile(filePath, &info)) {
-        scriptEng.checkResult = true;
-        CloseFile();
-    }
-}
-
-#if RETRO_USE_MOD_LOADER
-void GetScreenWidth() { scriptEng.checkResult = SCREEN_XSIZE_CONFIG; }
-void GetWindowScale() { scriptEng.checkResult = Engine.windowScale; }
-void GetWindowScaleMode() { scriptEng.checkResult = Engine.scalingMode; }
-void GetWindowFullScreen() { scriptEng.checkResult = Engine.isFullScreen; }
-void GetWindowBorderless() { scriptEng.checkResult = Engine.borderless; }
-void GetWindowVSync() { scriptEng.checkResult = Engine.vsync; }
-
-bool changedScreenWidth = false;
-void SetScreenWidth(int *width, int *unused)
-{
-    if (!width)
-        return;
-
-    SCREEN_XSIZE_CONFIG = *width;
-    changedScreenWidth  = SCREEN_XSIZE_CONFIG != SCREEN_XSIZE;
-}
-
-void SetWindowScale(int *scale, int *unused)
-{
-    if (!scale)
-        return;
-
-    Engine.windowScale = *scale;
-}
-
-void SetWindowScaleMode(int *mode, int *unused)
-{
-    if (!mode)
-        return;
-
-    Engine.scalingMode = *mode;
-}
-
-void SetWindowFullScreen(int *fullscreen, int *unused)
-{
-    if (!fullscreen)
-        return;
-
-    Engine.isFullScreen    = *fullscreen;
-    Engine.startFullScreen = *fullscreen;
-}
-
-void SetWindowBorderless(int *borderless, int *unused)
-{
-    if (!borderless)
-        return;
-
-    Engine.borderless = *borderless;
-}
-
-void SetWindowVSync(int *enabled, int *unused)
-{
-    if (!enabled)
-        return;
-
-    Engine.vsync = *enabled;
-}
-void ApplyWindowChanges()
-{
-#if RETRO_USING_OPENGL
-    for (int i = 0; i < TEXTURE_COUNT; ++i) {
-        glDeleteTextures(1, &textureList[i].id);
-    }
-#endif
-
-    for (int i = 0; i < MESH_COUNT; ++i) {
-        MeshInfo *mesh = &meshList[i];
-        if (StrLength(mesh->fileName)) {
-            if (mesh->frameCount > 1)
-                free(mesh->frames);
-            if (mesh->indexCount)
-                free(mesh->indices);
-            if (mesh->vertexCount)
-                free(mesh->vertices);
-
-            mesh->frameCount  = 0;
-            mesh->indexCount  = 0;
-            mesh->vertexCount = 0;
-        }
-    }
-
-    if (changedScreenWidth)
-        SCREEN_XSIZE = SCREEN_XSIZE_CONFIG;
-    changedScreenWidth = false;
-
-    ReleaseRenderDevice(true);
-    InitRenderDevice();
-
-    for (int i = 1; i < TEXTURE_COUNT; ++i) {
-        if (StrLength(textureList[i].fileName)) {
-            char fileName[64];
-            StrCopy(fileName, textureList[i].fileName);
-            textureList[i].fileName[0] = 0;
-
-            LoadTexture(fileName, textureList[i].format);
-        }
-    }
-
-    for (int i = 0; i < MESH_COUNT; ++i) {
-        if (StrLength(meshList[i].fileName)) {
-            char fileName[64];
-            StrCopy(fileName, meshList[i].fileName);
-            meshList[i].fileName[0] = 0;
-
-            LoadMesh(fileName, meshList[i].textureID);
-        }
-    }
-}
-#endif

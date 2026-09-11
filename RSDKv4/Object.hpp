@@ -3,15 +3,10 @@
 
 #define NATIVEENTITY_COUNT (0x100)
 
-#define ENTITY_COUNT     (0x4A0)
+#define ENTITY_COUNT (0x4A0)
 #define TEMPENTITY_START (ENTITY_COUNT - 0x80)
-#define OBJECT_COUNT     (0x100)
-#define TYPEGROUP_COUNT  (0x103)
-
-enum ObjectControlModes {
-    CONTROLMODE_NONE   = -1,
-    CONTROLMODE_NORMAL = 0,
-};
+#define OBJECT_COUNT (0x100)
+#define TYPEGROUP_COUNT (0x103)
 
 struct TypeGroupList {
     int entityRefs[ENTITY_COUNT];
@@ -19,10 +14,10 @@ struct TypeGroupList {
 };
 
 struct Entity {
-    int xpos;
-    int ypos;
-    int xvel;
-    int yvel;
+    int XPos;
+    int YPos;
+    int XVelocity;
+    int YVelocity;
     int speed;
     int values[48];
     int state;
@@ -32,13 +27,13 @@ struct Entity {
     int alpha;
     int animationTimer;
     int animationSpeed;
-    int lookPosX;
-    int lookPosY;
-    ushort groupID;
+    int camOffsetX;
+    int lookPos;
+    ushort typeGroup;
     byte type;
     byte propertyValue;
     byte priority;
-    byte drawOrder;
+    sbyte drawOrder;
     byte direction;
     byte inkEffect;
     byte animation;
@@ -59,58 +54,45 @@ struct Entity {
     byte down;
     byte jumpPress;
     byte jumpHold;
-    byte scrollTracking;
-    // was 3 on S1 release, but bumped up to 5 for S2
-    byte floorSensors[RETRO_REV00 ? 3 : 5];
+    byte trackScroll;
+    byte flailing[5];
 };
 
 struct NativeEntityBase {
-    void (*eventCreate)(void *objPtr);
-    void (*eventMain)(void *objPtr);
+    void (*createPtr)(void *objPtr);
+    void (*mainPtr)(void *objPtr);
     int slotID;
     int objectID;
 };
 
 struct NativeEntity {
-    void (*eventCreate)(void *objPtr);
-    void (*eventMain)(void *objPtr);
+    void (*createPtr)(void *objPtr);
+    void (*mainPtr)(void *objPtr);
     int slotID;
     int objectID;
-    void *extra[0x100];
+    byte extra[0x400];
 };
 
 enum ObjectTypes {
-    OBJ_TYPE_BLANKOBJECT = 0 // 0 is always blank obj
-};
-
-enum ObjectGroups {
-    GROUP_ALL = 0 // 0 is always "all"
+    OBJ_TYPE_BLANKOBJECT = 0 //0 is always blank obj
 };
 
 enum ObjectPriority {
-    // The entity is active if the entity is on screen or within 128 pixels of the screen borders on any axis
-    PRIORITY_BOUNDS,
-    // The entity is always active, unless the stage state is PAUSED/FROZEN
+    PRIORITY_ACTIVE_BOUNDS,
     PRIORITY_ACTIVE,
-    // Same as PRIORITY_ACTIVE, the entity even runs when the stage state is PAUSED/FROZEN
-    PRIORITY_ALWAYS,
-    // Same as PRIORITY_BOUNDS, however it only does checks on the x-axis, so when in bounds on the x-axis, the y position doesn't matter
-    PRIORITY_XBOUNDS,
-    // Same as PRIORITY_XBOUNDS, however the entity's type will be set to BLANK OBJECT when it becomes inactive
-    PRIORITY_XBOUNDS_DESTROY,
-    // Never Active.
+    PRIORITY_ACTIVE_PAUSED,
+    PRIORITY_ACTIVE_XBOUNDS,
+    PRIORITY_ACTIVE_XBOUNDS_REMOVE,
     PRIORITY_INACTIVE,
-    // Same as PRIORITY_BOUNDS, but uses the smaller bounds (32px off screen rather than the normal 128)
-    PRIORITY_BOUNDS_SMALL,
-    // Same as PRIORITY_ACTIVE, but uses the smaller bounds in object.outOfBounds
-    PRIORITY_ACTIVE_SMALL
+    PRIORITY_ACTIVE_BOUNDS_SMALL,
+    PRIORITY_ACTIVE2
 };
 
-// Native Objects
+//Native Objects
 extern int nativeEntityPos;
 
 extern int activeEntityList[NATIVEENTITY_COUNT];
-extern byte objectRemoveFlag[NATIVEENTITY_COUNT];
+extern int objectRemoveFlag[NATIVEENTITY_COUNT];
 extern NativeEntity objectEntityBank[NATIVEENTITY_COUNT];
 extern int nativeEntityCount;
 
@@ -122,10 +104,10 @@ extern int nativeEntityCountBackupS;
 extern int backupEntityListS[NATIVEENTITY_COUNT];
 extern NativeEntity objectEntityBackupS[NATIVEENTITY_COUNT];
 
-// Game Objects
+//Game Objects
 extern int objectEntityPos;
 extern int curObjectType;
-extern Entity objectEntityList[ENTITY_COUNT * 2];
+extern Entity objectEntityList[ENTITY_COUNT];
 extern int processObjectFlag[ENTITY_COUNT];
 extern TypeGroupList objectTypeGroupList[TYPEGROUP_COUNT];
 
@@ -144,58 +126,71 @@ void ProcessStartupObjects();
 void ProcessObjects();
 void ProcessPausedObjects();
 void ProcessFrozenObjects();
-#if !RETRO_REV00
 void Process2PObjects();
-#endif
 
 void SetObjectTypeName(const char *objectName, int objectID);
 
 extern int playerListPos;
 
-void ProcessObjectControl(Entity *entity);
+void ProcessPlayerControl(Entity *player);
 
 void InitNativeObjectSystem();
 NativeEntity *CreateNativeObject(void (*objCreate)(void *objPtr), void (*objMain)(void *objPtr));
 void RemoveNativeObject(NativeEntityBase *NativeEntry);
-void ResetNativeObject(NativeEntityBase *obj, void (*objCreate)(void *objPtr), void (*objMain)(void *objPtr));
 void ProcessNativeObjects();
-inline void BackupNativeObjects()
-{
-    memcpy(backupEntityList, activeEntityList, sizeof(activeEntityList));
-    memcpy(objectEntityBackup, objectEntityBank, sizeof(objectEntityBank));
+inline void BackupNativeObjects() {
+    memcpy(backupEntityList, activeEntityList, sizeof(int) * NATIVEENTITY_COUNT);
+    memcpy(objectEntityBackup, objectEntityBank, sizeof(NativeEntity) * NATIVEENTITY_COUNT);
     nativeEntityCountBackup = nativeEntityCount;
 }
-inline void BackupNativeObjectsSettings()
-{
-    memcpy(backupEntityListS, activeEntityList, sizeof(activeEntityList));
-    memcpy(objectEntityBackupS, objectEntityBank, sizeof(objectEntityBank));
+inline void BackupNativeObjectsSettings() {
+    memcpy(backupEntityListS, activeEntityList, sizeof(int) * NATIVEENTITY_COUNT);
+    memcpy(objectEntityBackupS, objectEntityBank, sizeof(NativeEntity) * NATIVEENTITY_COUNT);
     nativeEntityCountBackupS = nativeEntityCount;
 }
-void RestoreNativeObjects();
-void RestoreNativeObjectsNoFade();
-void RestoreNativeObjectsSettings();
+inline void RestoreNativeObjects()
+{
+    memcpy(activeEntityList, backupEntityList, sizeof(int) * NATIVEENTITY_COUNT);
+    nativeEntityCount = nativeEntityCountBackup;
+    memcpy(objectEntityBank, objectEntityBackup, sizeof(NativeEntity) * NATIVEENTITY_COUNT);
+
+    //ptr = CreateNativeObject(FadeScreen_Create, FadeScreen_Main);
+    //ptr + 16 = 0;
+}
+inline void RestoreNativeObjectsNoFade()
+{
+    memcpy(activeEntityList, backupEntityList, sizeof(int) * NATIVEENTITY_COUNT);
+    nativeEntityCount = nativeEntityCountBackup;
+    memcpy(objectEntityBank, objectEntityBackup, sizeof(NativeEntity) * NATIVEENTITY_COUNT);
+}
+inline void RestoreNativeObjectsSettings()
+{
+    memcpy(activeEntityList, backupEntityListS, sizeof(int) * NATIVEENTITY_COUNT);
+    nativeEntityCount = nativeEntityCountBackupS;
+    memcpy(objectEntityBank, objectEntityBackupS, sizeof(NativeEntity) * NATIVEENTITY_COUNT);
+}
+inline void GetNativeObject(NativeEntity *obj, void (*newCreate)(void *objPtr), void (*newMain)(void *objPtr))
+{
+    int slotID = obj->slotID;
+    int objID  = obj->objectID;
+    memset(&objectEntityBank[slotID], 0, sizeof(NativeEntity));
+    obj->slotID   = slotID;
+    obj->mainPtr     = newMain;
+    obj->createPtr   = newCreate;
+    obj->objectID = objID;
+    if (obj->createPtr)
+        obj->createPtr(obj);
+}
 inline NativeEntity *GetNativeObject(uint objID)
 {
-    if (objID >= NATIVEENTITY_COUNT)
+    if (objID > 0xFF)
         return nullptr;
     else
         return &objectEntityBank[objID];
 }
-
-// Custom, used for cleaning purposes
-inline void RemoveNativeObjectType(void (*eventCreate)(void *objPtr), void (*eventMain)(void *objPtr))
-{
-    for (int i = nativeEntityCount - 1; i >= 0; --i) {
-        NativeEntity *entity = &objectEntityBank[activeEntityList[i]];
-        if (entity->eventCreate == eventCreate && entity->eventMain == eventMain) {
-            RemoveNativeObject((NativeEntityBase *)entity);
-        }
-    }
-}
-inline void ClearNativeObjects()
-{
+inline void ClearNativeObjects() {
     nativeEntityCount = 0;
-    memset(objectEntityBank, 0, sizeof(objectEntityBank));
+    memset(objectEntityBank, 0, sizeof(NativeEntity) * NATIVEENTITY_COUNT);
 }
 
 #endif // !OBJECT_H

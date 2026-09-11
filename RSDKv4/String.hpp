@@ -2,11 +2,9 @@
 #define STRING_H
 
 #define STRSTORAGE_SIZE (1000)
-#define STRING_SIZE     (0x400)
+#define STRING_SIZE (0x200)
 
-#define CREDITS_LIST_COUNT (0x200)
-
-enum TextAlignments { ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT };
+#define CREDITS_LIST_SIZE (0x200)
 
 #define USE_STDLIB
 
@@ -41,8 +39,8 @@ extern ushort *strNSRestartMessage;
 extern ushort *strNSExitMessage;
 extern ushort *strExitGame;
 extern ushort *strNetworkMessage;
-extern ushort *strStageList[16];
-extern ushort *strSaveStageList[32];
+extern ushort *strStageList[8];
+extern ushort *strSaveStageList[26];
 extern ushort *strNewBestTime;
 extern ushort *strRecords;
 extern ushort *strNextAct;
@@ -73,23 +71,27 @@ extern ushort *strTerms;
 
 extern int stageStrCount;
 
-extern ushort stringStorage[STRSTORAGE_SIZE * STRING_SIZE];
+extern ushort stringStorage[STRSTORAGE_SIZE][STRING_SIZE];
 extern int stringStorePos;
 
 extern int creditsListSize;
-extern ushort *strCreditsList[CREDITS_LIST_COUNT];
-extern byte creditsType[CREDITS_LIST_COUNT];
-extern float creditsAdvanceY[CREDITS_LIST_COUNT];
+extern const ushort *strCreditsList[CREDITS_LIST_SIZE];
+extern byte creditsType[CREDITS_LIST_SIZE];
+extern float creditsAdvanceY[CREDITS_LIST_SIZE];
 
 inline void StrCopy(char *dest, const char *src)
 {
-#ifdef USE_STDLIB
+    #ifdef USE_STDLIB
     strcpy(dest, src);
-#else
+
+    #else
     int i = 0;
+
     for (; src[i]; ++i) dest[i] = src[i];
+
     dest[i] = 0;
-#endif
+
+    #endif
 }
 
 inline void StrAdd(char *dest, const char *src)
@@ -130,24 +132,28 @@ inline bool StrComp(const char *stringA, const char *stringB)
 
 inline int StrLength(const char *string)
 {
-#ifdef USE_STDLIB
-    return (int)strlen(string);
-#else
+    #ifdef USE_STDLIB
+    return strlen(string);
+
+    #else
     int len = 0;
     for (len = 0; string[len]; len++)
         ;
     return len;
-#endif
+
+    #endif
 }
 int FindStringToken(const char *string, const char *token, char stopID);
-int FindLastStringToken(const char *string, const char *token);
 
 inline void StrCopyW(ushort *dest, const ushort *src)
 {
     int i = 0;
+
     for (; src[i]; ++i) dest[i] = src[i];
+
     dest[i] = 0;
 }
+
 
 inline void StrAddW(ushort *dest, const ushort *src)
 {
@@ -165,7 +171,9 @@ inline void StrAddW(ushort *dest, const ushort *src)
 inline void StrCopyW(ushort *dest, const char *src)
 {
     int i = 0;
+
     for (; src[i]; ++i) dest[i] = src[i];
+
     dest[i] = 0;
 }
 
@@ -247,7 +255,7 @@ inline void StringLowerCase(char *dest, const char *src)
             while (curChar - 'A' <= 0x19u) {
                 destPos       = srcPos;
                 dest[destPos] = curChar + ' ';
-                curChar       = src[++srcPos];
+                curChar  = src[++srcPos];
                 if (!curChar) {
                     dest[++destPos] = 0;
                     return;
@@ -271,7 +279,7 @@ inline void StringUpperCase(char *dest, const char *src)
             while (curChar - 'a' <= 0x19u) {
                 destPos       = srcPos;
                 dest[destPos] = curChar - ' ';
-                curChar       = src[++srcPos];
+                curChar  = src[++srcPos];
                 if (!curChar) {
                     dest[++destPos] = 0;
                     return;
@@ -287,7 +295,7 @@ inline void StringUpperCase(char *dest, const char *src)
 
 void ConvertIntegerToString(char *text, int value);
 
-void GenerateMD5FromString(const char *string, int len, uint *hash0, uint *hash1, uint *hash2, uint *hash3);
+void GenerateMD5FromString(const char *string, int len, byte *buffer);
 
 void InitLocalizedStrings();
 ushort *ReadLocalizedString(const char *stringName, const char *language, const char *filePath);
@@ -299,10 +307,11 @@ inline void ReadStringLine(char *text)
     int textPos = 0;
     while (true) {
         FileRead(&curChar, 1);
-
+        if (curChar == '\t' || curChar == ' ')
+            break;
         if (curChar == '\r' || curChar == '\n')
             break;
-        if (curChar != ';' && curChar != '\t' && curChar != ' ')
+        if (curChar != ';')
             text[textPos++] = curChar;
 
         if (ReachedEndOfFile()) {
@@ -324,44 +333,36 @@ inline void ReadStringLine(char *text)
 
 inline void ReadStringLineUnicode(ushort *text)
 {
-    bool lineEnding;
-    ushort curChar = 0;
+    int curChar = 0;
     byte fileBuffer[2];
 
     int textPos = 0;
     while (true) {
         FileRead(fileBuffer, 2);
         curChar = fileBuffer[0] + (fileBuffer[1] << 8);
-        lineEnding = false;
-
-        switch (curChar) {
-            case '\t':
-            case ' ':
-                break;
-
-            case '\n':
-            case '\r':
-                lineEnding = true;
-                text[textPos] = 0;
-                break;
-
-            case ';':
-                break;
-
-            default:
+        if (curChar != ' ' && curChar != '\t') {
+            if (curChar == '\r') {
+                int pos = (int)GetFilePosition();
+                FileRead(fileBuffer, 2);
+                curChar = fileBuffer[0] + (fileBuffer[1] << 8);
+                if (curChar == '\n')
+                    break;
+                SetFilePosition(pos);
+            }
+            if (curChar != ';')
                 text[textPos++] = curChar;
-                break;
         }
+        else if (curChar == '\n' || curChar == '\r')
+            break;
 
         if (ReachedEndOfFile()) {
             text[textPos] = 0;
             return;
         }
-
-        if (lineEnding) {
-            return;
-        }
     }
+    text[textPos] = 0;
+    if (ReachedEndOfFile())
+        text[textPos] = 0;
 }
 
 void ReadCreditsList(const char *filePath);
