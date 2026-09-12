@@ -39,6 +39,7 @@ bool mixFiltersOnJekyll = false;
 GLint defaultFramebuffer = -1;
 GLuint framebufferHiRes  = -1;
 GLuint renderbufferHiRes = -1;
+GLuint videoBuffer       = -1;
 #endif
 
 #if !RETRO_USE_ORIGINAL_CODE
@@ -279,6 +280,14 @@ int InitRenderDevice()
     memset(Engine.frameBuffer, 0, (GFX_LINESIZE * SCREEN_YSIZE) * sizeof(ushort));
     memset(Engine.frameBuffer2x, 0, GFX_LINESIZE_DOUBLE * (SCREEN_YSIZE * 2) * sizeof(ushort));
 #endif
+#if RETRO_USING_OPENGL
+if (videoPlaying) {
+    if (videoTexBuffer <= 0) {
+        glGenTextures(1, &videoTexBuffer);
+        glBindTexture(GL_TEXTURE_2D, videoTexBuffer);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    }
     Engine.texBuffer = new uint[GFX_LINESIZE * SCREEN_YSIZE];
     memset(Engine.texBuffer, 0, (GFX_LINESIZE * SCREEN_YSIZE) * sizeof(uint));
 
@@ -905,7 +914,9 @@ void SetupViewport()
         transfer = true;
     }
     glGenTextures(1, &textureList[0].id);
-    glBindTexture(GL_TEXTURE_2D, textureList[0].id);
+    glBindTexture(GL_TEXTURE_2D, videoTexBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, videoWidth, videoHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, /* puntero a los píxeles del frame actual */);
+}
 #endif
 
     convertTo32Bit = true;
