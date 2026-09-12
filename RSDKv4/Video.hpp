@@ -1,7 +1,5 @@
-#ifndef VIDEO_H
-#define VIDEO_H
-
-#include <theoraplay.h>
+#ifndef VIDEO_HPP
+#define VIDEO_HPP
 
 extern int currentVideoFrame;
 extern int videoFrameCount;
@@ -11,7 +9,6 @@ extern float videoAR;
 
 extern THEORAPLAY_Decoder *videoDecoder;
 extern const THEORAPLAY_VideoFrame *videoVidData;
-extern const THEORAPLAY_AudioPacket *videoAudioData;
 extern THEORAPLAY_Io callbacks;
 
 extern byte videoData;
@@ -20,12 +17,13 @@ extern bool videoPlaying;
 extern int vidFrameMS;
 extern int vidBaseticks;
 
-void PlayVideoFile(char *filepath);
+extern bool videoSkipped;
+
+void PlayVideoFile(char *filePath);
 void UpdateVideoFrame();
 int ProcessVideo();
 void StopVideoPlayback();
-
 void SetupVideoBuffer(int width, int height);
 void CloseVideoBuffer();
 
-#endif // !VIDEO_H
+#endif // VIDEO_HPP
