@@ -346,7 +346,6 @@ extern bool engineDebugMode;
 #include "Script.hpp"
 #include "Sprite.hpp"
 #include "Text.hpp"
-#include "Video.hpp"
 #include "Networking.hpp"
 #include "Renderer.hpp"
 #include "Userdata.hpp"
@@ -514,8 +513,24 @@ public:
 #if RETRO_SOFTWARE_RENDER
     SDL_Texture *screenBuffer   = nullptr;
     SDL_Texture *screenBuffer2x = nullptr;
+    SDL_Texture *videoBuffer    = nullptr;
 #endif // RETRO_SOFTWARE_RENDERER
 #endif
+
+    SDL_Event sdlEvents;
+
+#if RETRO_USING_OPENGL
+    SDL_GLContext glContext; // OpenGL context
+#endif // RETRO_USING_OPENGL
+#endif // RETRO_USING_SDL2
+
+#if RETRO_USING_SDL1
+    SDL_Surface *windowSurface = nullptr;
+
+    SDL_Surface *screenBuffer   = nullptr;
+    SDL_Surface *screenBuffer2x = nullptr;
+    SDL_Surface *videoBuffer    = nullptr;
+
 
     SDL_Event sdlEvents;
 
