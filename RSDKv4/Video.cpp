@@ -49,7 +49,7 @@ void PlayVideoFile(char *filePath)
 
     FileIO *file = fOpen(filepath, "rb");
     if (file) {
-        printLog("Loaded File '%s'!", filepath);
+        PrintLog("Loaded File '%s'!", filepath);
 
         callbacks.read     = videoRead;
         callbacks.close    = videoClose;
@@ -65,7 +65,7 @@ void PlayVideoFile(char *filePath)
 
 
         if (!videoDecoder) {
-            printLog("Video Decoder Error!");
+            PrintLog("Video Decoder Error!");
             return;
         }
         while (!videoVidData) {
@@ -73,7 +73,7 @@ void PlayVideoFile(char *filePath)
                 videoVidData = THEORAPLAY_getVideo(videoDecoder);
         }
         if (!videoVidData) {
-            printLog("Video Error!");
+            PrintLog("Video Error!");
             return;
         }
 
@@ -92,7 +92,7 @@ void PlayVideoFile(char *filePath)
         Engine.gameMode = ENGINE_VIDEOWAIT;
     }
     else {
-        printLog("Couldn't find file '%s'!", filepath);
+        PrintLog("Couldn't find file '%s'!", filepath);
     }
 }
 
@@ -264,7 +264,7 @@ void SetupVideoBuffer(int width, int height)
 #endif
 
     if (!Engine.videoBuffer)
-        printLog("Failed to create video buffer!");
+        PrintLog("Failed to create video buffer!");
 }
 
 void CloseVideoBuffer()
@@ -278,4 +278,3 @@ void CloseVideoBuffer()
 #endif
         Engine.videoBuffer = nullptr;
     }
-}
