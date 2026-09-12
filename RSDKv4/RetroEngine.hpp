@@ -336,6 +336,7 @@ extern bool engineDebugMode;
 #include "String.hpp"
 #include "Animation.hpp"
 #include "Audio.hpp"
+#include "Video.cpp"
 #include "Input.hpp"
 #include "Object.hpp"
 #include "Palette.hpp"
