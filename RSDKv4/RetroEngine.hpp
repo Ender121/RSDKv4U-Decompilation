@@ -300,11 +300,7 @@ enum RetroGameType {
 #include <SDL.h>
 #endif
 #include <vorbis/vorbisfile.h>
-#elif RETRO_PLATFORM == RETRO_OSX
-#include <SDL2/SDL.h>
-#include <Vorbis/vorbisfile.h>
-
- <theora/theora.h>
+#include <theora/theora.h>
 #include <theoraplay.h>
 #elif RETRO_PLATFORM == RETRO_OSX
 #include <SDL2/SDL.h>
@@ -336,7 +332,7 @@ extern bool engineDebugMode;
 #include "String.hpp"
 #include "Animation.hpp"
 #include "Audio.hpp"
-#include "Video.cpp"
+#include "Video.hpp"
 #include "Input.hpp"
 #include "Object.hpp"
 #include "Palette.hpp"
