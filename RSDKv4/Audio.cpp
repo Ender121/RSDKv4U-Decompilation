@@ -33,6 +33,7 @@ int currentMusicTrack = -1;
 
 #if RETRO_USING_SDL2
 SDL_AudioDeviceID audioDevice;
+SDL_AudioStream *ogv_stream;
 #endif
 SDL_AudioSpec audioDeviceFormat;
 
@@ -64,6 +65,19 @@ int InitAudioPlayback()
     }
     else {
         PrintLog("Unable to open audio device: %s", SDL_GetError());
+        audioEnabled = false;
+        return true; // no audio but game wont crash now
+    }
+
+    // Init video sound stuff
+    // TODO: Unfortunately, we're assuming that video sound is stereo at 48000Hz.
+    // This is true of every .ogv file in the game (the Steam version, at least),
+    // but it would be nice to make this dynamic. Unfortunately, THEORAPLAY's API
+    // makes this awkward.
+    ogv_stream = SDL_NewAudioStream(AUDIO_F32SYS, 2, 48000, audioDeviceFormat.format, audioDeviceFormat.channels, audioDeviceFormat.freq);
+    if (!ogv_stream) {
+        PrintLog("Failed to create stream: %s", SDL_GetError());
+        SDL_CloseAudioDevice(audioDevice);
         audioEnabled = false;
         return true; // no audio but game wont crash now
     }

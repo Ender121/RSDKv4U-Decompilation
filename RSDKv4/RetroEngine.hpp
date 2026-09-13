@@ -300,9 +300,13 @@ enum RetroGameType {
 #include <SDL.h>
 #endif
 #include <vorbis/vorbisfile.h>
+#include <theora/theora.h>
+#include <theoraplay.h>
 #elif RETRO_PLATFORM == RETRO_OSX
 #include <SDL2/SDL.h>
 #include <Vorbis/vorbisfile.h>
+#include <theora/theora.h>
+#include <theoraplay.h>
 
 #include "cocoaHelpers.hpp"
 
@@ -328,6 +332,7 @@ extern bool engineDebugMode;
 #include "String.hpp"
 #include "Animation.hpp"
 #include "Audio.hpp"
+#include "Video.hpp"
 #include "Input.hpp"
 #include "Object.hpp"
 #include "Palette.hpp"
@@ -505,8 +510,24 @@ public:
 #if RETRO_SOFTWARE_RENDER
     SDL_Texture *screenBuffer   = nullptr;
     SDL_Texture *screenBuffer2x = nullptr;
+    SDL_Texture *videoBuffer    = nullptr;
 #endif // RETRO_SOFTWARE_RENDERER
 #endif
+
+    SDL_Event sdlEvents;
+
+#if RETRO_USING_OPENGL
+    SDL_GLContext glContext; // OpenGL context
+#endif // RETRO_USING_OPENGL
+#endif // RETRO_USING_SDL2
+
+#if RETRO_USING_SDL1
+    SDL_Surface *windowSurface = nullptr;
+
+    SDL_Surface *screenBuffer   = nullptr;
+    SDL_Surface *screenBuffer2x = nullptr;
+    SDL_Surface *videoBuffer    = nullptr;
+
 
     SDL_Event sdlEvents;
 

@@ -26,6 +26,7 @@ set(RETRO_OUTPUT_NAME ${RETRO_NAME} CACHE STRING "The exported name of the execu
 
 set(RETRO_FILES
     dependencies/all/tinyxml2/tinyxml2.cpp
+    dependencies/all/theoraplay/theoraplay.c
     RSDKv4/Animation.cpp
     RSDKv4/Audio.cpp
     RSDKv4/Collision.cpp
@@ -225,6 +226,7 @@ endif()
 target_include_directories(RetroEngine PRIVATE
     RSDKv4/
     RSDKv4/NativeObjects/
+    dependencies/all/theoraplay/
     dependencies/all/stb-image/
     dependencies/all/tinyxml2/
 )
