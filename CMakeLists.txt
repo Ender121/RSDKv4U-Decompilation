@@ -201,7 +201,7 @@ if(COMPILE_THEORA)
 
     target_compile_options(libtheora PRIVATE ${THEORA_FLAGS})
 
-    target_include_directories(libtheora PRIVATE ${THEORA_DIR}/include ${OGG_DIR}/include)
+    target_include_directories(libtheora PRIVATE ${THEORA_DIR}/include dependencies/all/libogg/include)
     target_include_directories(RetroEngine PRIVATE ${THEORA_DIR}/include)
     target_link_libraries(RetroEngine libtheora)
 endif()
