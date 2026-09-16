@@ -50,13 +50,13 @@ cmake/
 ![Dd]ependencies/all/theoraplay
 ![Dd]ependencies/all/libtheora
 ![Dd]ependencies/all/libogg
+![Dd]ependencies/all/libvorbis
 ![Dd]ependencies/windows/dependencies.txt
 ![Dd]ependencies/ios/dependencies.txt
 ![Dd]ependencies/mac/dependencies.txt
 ![Dd]ependencies/windows-uwp/dependencies.txt
 ![Dd]ependencies/android/README.md
 ![Dd]ependencies/android/libogg/include/ogg/config_types.h
-
 # UWP
 **/Generated Files
 **/BundleArtifacts
