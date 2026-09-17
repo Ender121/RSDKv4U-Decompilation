@@ -271,6 +271,7 @@ enum RetroStates {
     ENGINE_EXITPAUSE   = 6,
     ENGINE_ENDGAME     = 7,
     ENGINE_RESETGAME   = 8,
+    ENGINE_VIDEOWAIT   = 9,
 
 #if !RETRO_USE_ORIGINAL_CODE && RETRO_USE_NETWORKING
     // Custom GameModes (required to make some features work)

@@ -277,4 +277,4 @@ void CloseVideoBuffer()
         SDL_DestroyTexture(Engine.videoBuffer);
 #endif
         Engine.videoBuffer = nullptr;
-    }
+    
