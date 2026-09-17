@@ -512,6 +512,8 @@ public:
     SDL_Texture *screenBuffer2x = nullptr;
     SDL_Texture *videoBuffer    = nullptr;
 #endif // RETRO_SOFTWARE_RENDERER
+#else
+    SDL_Surface *videoBuffer = nullptr;
 #endif
 
     SDL_Event sdlEvents;
