@@ -208,12 +208,12 @@ int ProcessVideo()
                 const Uint8 *u = y + (videoVidData->width * videoVidData->height);
                 const Uint8 *v = u + (half_w * (videoVidData->height / 2));
 
-#if RETRO_USING_SDL2
-                SDL_UpdateYUVTexture(Engine.videoBuffer, NULL, y, videoVidData->width, u, half_w, v, half_w);
+#if RETRO_USING_SDL2 && !RETRO_USING_OPENGL
+    SDL_UpdateYUVTexture(Engine.videoBuffer, NULL, y, videoVidData->width, u, half_w, v, half_w);
 #endif
-#if RETRO_USING_SDL1
-                uint *videoFrameBuffer = (uint *)Engine.videoBuffer->pixels;
-                memcpy(videoFrameBuffer, videoVidData->pixels, videoVidData->width * videoVidData->height * sizeof(uint));
+#if RETRO_USING_SDL1 || (RETRO_USING_SDL2 && RETRO_USING_OPENGL)
+    uint *videoFrameBuffer = (uint *)Engine.videoBuffer->pixels;
+    memcpy(videoFrameBuffer, videoVidData->pixels, videoVidData->width * videoVidData->height * sizeof(uint));
 #endif
 
                 THEORAPLAY_freeVideo(videoVidData);
@@ -256,10 +256,10 @@ void StopVideoPlayback()
 
 void SetupVideoBuffer(int width, int height)
 {
-#if RETRO_USING_SDL1
+#if RETRO_USING_SDL1 || (RETRO_USING_SDL2 && RETRO_USING_OPENGL)
     Engine.videoBuffer = SDL_CreateRGBSurface(0, width, height, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
 #endif
-#if RETRO_USING_SDL2
+#if RETRO_USING_SDL2 && !RETRO_USING_OPENGL
     Engine.videoBuffer = SDL_CreateTexture(Engine.renderer, SDL_PIXELFORMAT_YV12, SDL_TEXTUREACCESS_STREAMING, width, height);
 #endif
 
@@ -270,11 +270,11 @@ void SetupVideoBuffer(int width, int height)
 void CloseVideoBuffer()
 {
     if (videoPlaying) {
-#if RETRO_USING_SDL1
+#if RETRO_USING_SDL1 || (RETRO_USING_SDL2 && RETRO_USING_OPENGL)
         SDL_FreeSurface(Engine.videoBuffer);
 #endif
-#if RETRO_USING_SDL2
+#if RETRO_USING_SDL2 && !RETRO_USING_OPENGL
         SDL_DestroyTexture(Engine.videoBuffer);
 #endif
         Engine.videoBuffer = nullptr;
-    
+ 
