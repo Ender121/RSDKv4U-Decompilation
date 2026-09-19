@@ -221,7 +221,7 @@ if(COMPILE_THEORAPLAY)
         dependencies/all/libogg/include
     )
     target_include_directories(RetroEngine PRIVATE ${THEORAPLAY_DIR})
-    target_link_libraries(RetroEngine theoraplay libtheora libvorbis libogg)
+    target_link_libraries(RetroEngine theoraplay libtheora libvorbis libogg ${VORBIS_LIBRARIES} ${OGG_LIBRARIES})
 endif()
 
 target_include_directories(RetroEngine PRIVATE
