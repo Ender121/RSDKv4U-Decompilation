@@ -25,5 +25,8 @@ int ProcessVideo();
 void StopVideoPlayback();
 void SetupVideoBuffer(int width, int height);
 void CloseVideoBuffer();
+#if RETRO_USING_OPENGL
+void DrawVideoFrame();
+#endif
 
 #endif // VIDEO_HPP

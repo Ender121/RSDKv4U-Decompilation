@@ -389,7 +389,10 @@ void FlipScreen()
     SDL_RenderClear(Engine.renderer);
 
     ushort *pixels = NULL;
-    if (!drawStageGFXHQ) {
+    if (Engine.gameMode == ENGINE_VIDEOWAIT && Engine.videoBuffer) {
+        SDL_RenderCopy(Engine.renderer, Engine.videoBuffer, NULL, NULL);
+    }
+    else if (!drawStageGFXHQ) {
         SDL_LockTexture(Engine.screenBuffer, NULL, (void **)&pixels, &pitch);
         ushort *frameBufferPtr = Engine.frameBuffer;
         for (int y = 0; y < SCREEN_YSIZE; ++y) {
@@ -474,6 +477,12 @@ void FlipScreen()
 #endif
 
 #if RETRO_USING_SDL1
+    if (Engine.gameMode == ENGINE_VIDEOWAIT && Engine.videoBuffer) {
+        SDL_BlitSurface(Engine.videoBuffer, NULL, Engine.windowSurface, NULL);
+        SDL_Flip(Engine.windowSurface);
+        return;
+    }
+
     ushort *px = (ushort *)Engine.screenBuffer->pixels;
     int w      = SCREEN_XSIZE * Engine.windowScale;
     int h      = SCREEN_YSIZE * Engine.windowScale;

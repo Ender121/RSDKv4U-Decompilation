@@ -54,12 +54,11 @@ void PlayVideoFile(char *filePath)
         callbacks.read     = videoRead;
         callbacks.close    = videoClose;
         callbacks.userdata = (void *)file;
-#if RETRO_USING_SDL2
+        // The SDL2 renderer path uploads planar YUV straight into a YV12 texture. Every other path (SDL1, and SDL2 + OpenGL) copies the
+        // decoded frame into a 32-bit RGBA surface, so the decoder must output RGBA there or the memcpy below reads past the YUV buffer.
+#if RETRO_USING_SDL2 && !RETRO_USING_OPENGL
         videoDecoder = THEORAPLAY_startDecode(&callbacks, /*FPS*/ 30, THEORAPLAY_VIDFMT_IYUV, GetGlobalVariableByName("Options.Soundtrack") ? 1 : 0);
-#endif
-
-        //TODO: does SDL1.2 support YUV?
-#if RETRO_USING_SDL1
+#else
         videoDecoder = THEORAPLAY_startDecode(&callbacks, /*FPS*/ 30, THEORAPLAY_VIDFMT_RGBA, GetGlobalVariableByName("Options.Soundtrack") ? 1 : 0);
 #endif
 
@@ -279,3 +278,58 @@ void CloseVideoBuffer()
         Engine.videoBuffer = nullptr;
     }
 }
+
+#if RETRO_USING_OPENGL
+// Converts the latest decoded video frame (RGBA surface in Engine.videoBuffer) into the engine's 16-bit (RGB565) frame buffer, letterboxed to
+// keep the video's aspect ratio. The regular TransferRetroBuffer()/RenderRetroBuffer() path then presents it like any other frame.
+void DrawVideoFrame()
+{
+    memset(Engine.frameBuffer, 0, GFX_LINESIZE * SCREEN_YSIZE * sizeof(ushort));
+
+    if (!videoPlaying || !Engine.videoBuffer || videoWidth <= 0 || videoHeight <= 0)
+        return;
+
+    int dstW = SCREEN_XSIZE;
+    int dstH = SCREEN_YSIZE;
+    if (dstW * videoHeight > dstH * videoWidth)
+        dstW = dstH * videoWidth / videoHeight; // video is narrower than the screen: pillarbox
+    else
+        dstH = dstW * videoHeight / videoWidth; // video is wider than the screen: letterbox
+
+    if (dstW <= 0 || dstH <= 0)
+        return;
+
+    const int offX = (SCREEN_XSIZE - dstW) / 2;
+    const int offY = (SCREEN_YSIZE - dstH) / 2;
+
+    const uint *src   = (const uint *)Engine.videoBuffer->pixels;
+    const int srcPitch = Engine.videoBuffer->pitch / (int)sizeof(uint);
+
+    // fade to black while the video is being skipped
+    int fade = 256;
+    if (videoSkipped) {
+        int f = fadeMode > 255 ? 255 : fadeMode;
+        fade  = 256 - f;
+    }
+
+    for (int y = 0; y < dstH; ++y) {
+        const uint *row = src + (y * videoHeight / dstH) * srcPitch;
+        ushort *dst     = &Engine.frameBuffer[(y + offY) * GFX_LINESIZE + offX];
+
+        for (int x = 0; x < dstW; ++x) {
+            const uint px = row[x * videoWidth / dstW];
+            int r         = (px >> 0) & 0xFF;
+            int g         = (px >> 8) & 0xFF;
+            int b         = (px >> 16) & 0xFF;
+
+            if (fade < 256) {
+                r = (r * fade) >> 8;
+                g = (g * fade) >> 8;
+                b = (b * fade) >> 8;
+            }
+
+            dst[x] = (ushort)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+        }
+    }
+}
+#endif
