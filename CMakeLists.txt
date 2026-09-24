@@ -201,7 +201,15 @@ if(COMPILE_THEORA)
 
     target_compile_options(libtheora PRIVATE ${THEORA_FLAGS})
 
-    target_include_directories(libtheora PRIVATE ${THEORA_DIR}/include dependencies/all/libogg/include)
+    # Where the ogg headers come from: the libogg we build ourselves (Android, needs its generated config_types.h) or the repo copy
+    # (Linux/others, where the system ogg headers supply config_types.h).
+    if(COMPILE_OGG)
+        set(THEORA_OGG_INCLUDE ${OGG_DIR}/include)
+    else()
+        set(THEORA_OGG_INCLUDE dependencies/all/libogg/include)
+    endif()
+
+    target_include_directories(libtheora PRIVATE ${THEORA_DIR}/include ${THEORA_OGG_INCLUDE})
     target_include_directories(RetroEngine PRIVATE ${THEORA_DIR}/include)
     target_link_libraries(RetroEngine libtheora)
 endif()
@@ -218,10 +226,20 @@ if(COMPILE_THEORAPLAY)
         ${THEORA_DIR}/include
         ${VORBIS_DIR}/include
         dependencies/all/libvorbis/include
-        dependencies/all/libogg/include
+        ${THEORA_OGG_INCLUDE}
     )
     target_include_directories(RetroEngine PRIVATE ${THEORAPLAY_DIR})
-    target_link_libraries(RetroEngine theoraplay libtheora libvorbis libogg ${VORBIS_LIBRARIES} ${OGG_LIBRARIES})
+
+    # libogg/libvorbis are only CMake targets when they are compiled from source. When they come from the system (pkg-config) linking the
+    # bare names "libogg"/"libvorbis" makes the linker look for -llibogg/-llibvorbis, which doesn't exist.
+    set(THEORAPLAY_LINK theoraplay libtheora)
+    if(COMPILE_VORBIS)
+        list(APPEND THEORAPLAY_LINK libvorbis)
+    endif()
+    if(COMPILE_OGG)
+        list(APPEND THEORAPLAY_LINK libogg)
+    endif()
+    target_link_libraries(RetroEngine ${THEORAPLAY_LINK} ${VORBIS_LIBRARIES} ${OGG_LIBRARIES})
 endif()
 
 target_include_directories(RetroEngine PRIVATE
