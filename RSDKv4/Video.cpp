@@ -35,8 +35,13 @@ static void videoClose(THEORAPLAY_Io *io)
 
 void PlayVideoFile(char *filePath)
 {
-    char filepath[0x100];
+    char filepath[0x200];
+#if RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_ANDROID
+    // On these platforms the game files live in gamePath (like Data.rsdk), not relative to the working directory
+    sprintf(filepath, "%s/videos/", gamePath);
+#else
     StrCopy(filepath, BASE_PATH "videos/");
+#endif
 
     int len = StrLength(filePath);
 
@@ -279,7 +284,7 @@ void CloseVideoBuffer()
     }
 }
 
-#if RETRO_USING_OPENGL
+#if RETRO_USING_OPENGL || RETRO_USING_SDL1
 // Converts the latest decoded video frame (RGBA surface in Engine.videoBuffer) into the engine's 16-bit (RGB565) frame buffer, letterboxed to
 // keep the video's aspect ratio. The regular TransferRetroBuffer()/RenderRetroBuffer() path then presents it like any other frame.
 void DrawVideoFrame()

@@ -25,7 +25,7 @@ int ProcessVideo();
 void StopVideoPlayback();
 void SetupVideoBuffer(int width, int height);
 void CloseVideoBuffer();
-#if RETRO_USING_OPENGL
+#if RETRO_USING_OPENGL || RETRO_USING_SDL1
 void DrawVideoFrame();
 #endif
 

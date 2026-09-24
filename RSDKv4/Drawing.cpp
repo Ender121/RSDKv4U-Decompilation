@@ -390,7 +390,31 @@ void FlipScreen()
 
     ushort *pixels = NULL;
     if (Engine.gameMode == ENGINE_VIDEOWAIT && Engine.videoBuffer) {
-        SDL_RenderCopy(Engine.renderer, Engine.videoBuffer, NULL, NULL);
+        // size of whatever we are rendering into (the scaled target texture, or the logical screen)
+        int targetW = SCREEN_XSIZE, targetH = SCREEN_YSIZE;
+        if (texTarget)
+            SDL_QueryTexture(texTarget, NULL, NULL, &targetW, &targetH);
+
+        // keep the video's aspect ratio (bars are black, the screen was just cleared)
+        SDL_Rect videoDst = { 0, 0, targetW, targetH };
+        if (videoWidth > 0 && videoHeight > 0) {
+            if (targetW * videoHeight > targetH * videoWidth) {
+                videoDst.w = targetH * videoWidth / videoHeight;
+                videoDst.x = (targetW - videoDst.w) / 2;
+            }
+            else {
+                videoDst.h = targetW * videoHeight / videoWidth;
+                videoDst.y = (targetH - videoDst.h) / 2;
+            }
+        }
+
+        // fade to black while the video is being skipped
+        int videoFade = 255;
+        if (videoSkipped)
+            videoFade = 255 - (fadeMode > 255 ? 255 : fadeMode);
+        SDL_SetTextureColorMod(Engine.videoBuffer, videoFade, videoFade, videoFade);
+
+        SDL_RenderCopy(Engine.renderer, Engine.videoBuffer, NULL, &videoDst);
     }
     else if (!drawStageGFXHQ) {
         SDL_LockTexture(Engine.screenBuffer, NULL, (void **)&pixels, &pitch);
@@ -477,11 +501,9 @@ void FlipScreen()
 #endif
 
 #if RETRO_USING_SDL1
-    if (Engine.gameMode == ENGINE_VIDEOWAIT && Engine.videoBuffer) {
-        SDL_BlitSurface(Engine.videoBuffer, NULL, Engine.windowSurface, NULL);
-        SDL_Flip(Engine.windowSurface);
-        return;
-    }
+    // draw the current video frame into the frame buffer, the regular path below scales and presents it
+    if (Engine.gameMode == ENGINE_VIDEOWAIT && Engine.videoBuffer)
+        DrawVideoFrame();
 
     ushort *px = (ushort *)Engine.screenBuffer->pixels;
     int w      = SCREEN_XSIZE * Engine.windowScale;
