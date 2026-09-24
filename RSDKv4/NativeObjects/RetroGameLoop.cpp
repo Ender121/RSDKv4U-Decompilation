@@ -48,6 +48,19 @@ void RetroGameLoop_Main(void *objPtr)
 
         case ENGINE_WAIT: break;
 
+        case ENGINE_VIDEOWAIT:
+            if (ProcessVideo() != 2) { // 1: video finished / skipped, 0: nothing is actually playing
+                Engine.gameMode = ENGINE_MAINGAME;
+            }
+#if RETRO_USING_OPENGL
+            else {
+                DrawVideoFrame();
+                TransferRetroBuffer();
+                RenderRetroBuffer(64, 160.0);
+            }
+#endif
+            break;
+
         case ENGINE_SCRIPTERROR:
             Engine.LoadGameConfig("Data/Game/GameConfig.bin");
             InitErrorMessage();
