@@ -30,5 +30,9 @@ void CloseVideoBuffer();
 #if RETRO_USING_OPENGL || RETRO_USING_SDL1
 void DrawVideoFrame();
 #endif
+#if RETRO_USING_OPENGL
+void CreateVideoTexture(int width, int height);
+void DrawVideoFrameGL();
+#endif
 
 #endif // VIDEO_HPP

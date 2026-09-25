@@ -291,6 +291,37 @@ void StopVideoPlayback()
     }
 }
 
+#if RETRO_USING_OPENGL
+// Video gets one dedicated, permanently-reserved texture slot (the very last one -- nothing else in the engine claims a slot by counting
+// down from the end, so this can never collide with a sprite sheet a script loads) sized to the video's OWN resolution, completely
+// separate from the small textureList[0] "RetroBuffer" the rest of the game draws into. That's what lets the video display at its real
+// resolution instead of being downsampled into the game's internal (e.g. 424x240) screen buffer first.
+#define VIDEO_TEXTURE_SLOT (TEXTURE_COUNT - 1)
+
+void CreateVideoTexture(int width, int height)
+{
+    TextureInfo *texture = &textureList[VIDEO_TEXTURE_SLOT];
+
+    if (texture->id)
+        glDeleteTextures(1, &texture->id);
+
+    StrCopy(texture->fileName, "__RSDKv4U_VideoTexture");
+    texture->width   = width;
+    texture->height  = height;
+    texture->format  = TEXFMT_RGBA8888;
+    texture->widthN  = 1.0f / width;
+    texture->heightN = 1.0f / height;
+
+    glGenTextures(1, &texture->id);
+    glBindTexture(GL_TEXTURE_2D, texture->id);
+    // nullptr: just reserves the storage. The pixels are streamed in every frame afterwards via glTexSubImage2D (see DrawVideoFrameGL)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+#endif
+
 void SetupVideoBuffer(int width, int height)
 {
 #if RETRO_USING_SDL1 || (RETRO_USING_SDL2 && RETRO_USING_OPENGL)
@@ -302,6 +333,10 @@ void SetupVideoBuffer(int width, int height)
 
     if (!Engine.videoBuffer)
         PrintLog("Failed to create video buffer!");
+
+#if RETRO_USING_OPENGL
+    CreateVideoTexture(width, height);
+#endif
 }
 
 void CloseVideoBuffer()
@@ -316,6 +351,56 @@ void CloseVideoBuffer()
         Engine.videoBuffer = nullptr;
     }
 }
+
+#if RETRO_USING_OPENGL
+// Draws the video at its own native resolution, via its own dedicated texture (see CreateVideoTexture) -- completely separate from the
+// small internal game-screen buffer that DrawVideoFrame (below) downsamples into. This is the OpenGL-path equivalent of DrawVideoFrame;
+// RetroGameLoop's ENGINE_VIDEOWAIT case calls one or the other depending on the render path, never both.
+void DrawVideoFrameGL()
+{
+    if (!videoPlaying || !Engine.videoBuffer || videoWidth <= 0 || videoHeight <= 0)
+        return;
+
+    // Stream this frame's pixels into the texture. Same RGBA8 byte order SDL_CreateRGBSurface was given in SetupVideoBuffer, so this is a
+    // straight copy -- no channel reordering needed
+    TextureInfo *texture = &textureList[VIDEO_TEXTURE_SLOT];
+    glBindTexture(GL_TEXTURE_2D, texture->id);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, videoWidth, videoHeight, GL_RGBA, GL_UNSIGNED_BYTE, Engine.videoBuffer->pixels);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // Same aspect-preserving fit as DrawVideoFrame, just kept in floats here since RenderImage takes float scale factors rather than
+    // integer destination pixels
+    int dstW = SCREEN_XSIZE;
+    int dstH = SCREEN_YSIZE;
+    if (dstW * videoHeight > dstH * videoWidth)
+        dstW = dstH * videoWidth / videoHeight; // video is narrower than the screen: pillarbox
+    else
+        dstH = dstW * videoHeight / videoWidth; // video is wider than the screen: letterbox
+
+    if (dstW <= 0 || dstH <= 0)
+        return;
+
+    // Same combined fade-in/fade-out darkness as DrawVideoFrame, applied here as a vertex color tint (RenderImage multiplies the
+    // texture's pixels by vertexR/G/B) instead of baking it into the pixels, since we're not touching the pixels ourselves this time
+    int darkness = videoFadeIn > videoFadeOut ? videoFadeIn : videoFadeOut;
+    if (darkness > 255)
+        darkness = 255;
+    const byte tint = (byte)(256 - darkness > 255 ? 255 : 256 - darkness);
+    vertexR = tint;
+    vertexG = tint;
+    vertexB = tint;
+
+    // x=0,y=0 is screen center in this coordinate space (see retroVertexList in Drawing.cpp for the same convention). Anchoring on the
+    // video's own center (pivotX/Y) and scaling from there keeps the result centered exactly like the letterboxing above intends
+    RenderImage(0.0f, 0.0f, 160.0f, (float)dstW / videoWidth, (float)dstH / videoHeight, videoWidth / 2.0f, videoHeight / 2.0f,
+                (float)videoWidth, (float)videoHeight, 0.0f, 0.0f, 255, VIDEO_TEXTURE_SLOT);
+
+    // Don't leave the tint set for whatever draws next
+    vertexR = 0xFF;
+    vertexG = 0xFF;
+    vertexB = 0xFF;
+}
+#endif
 
 #if RETRO_USING_OPENGL || RETRO_USING_SDL1
 // Converts the latest decoded video frame (RGBA surface in Engine.videoBuffer) into the engine's 16-bit (RGB565) frame buffer, letterboxed to
