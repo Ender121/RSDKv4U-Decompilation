@@ -18,6 +18,8 @@ extern int vidFrameMS;
 extern int vidBaseticks;
 
 extern bool videoSkipped;
+extern int videoFadeIn;
+extern int videoFadeOut;
 
 void PlayVideoFile(char *filePath);
 void UpdateVideoFrame();

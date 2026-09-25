@@ -408,10 +408,12 @@ void FlipScreen()
             }
         }
 
-        // fade to black while the video is being skipped
-        int videoFade = 255;
-        if (videoSkipped)
-            videoFade = 255 - (fadeMode > 255 ? 255 : fadeMode);
+        // Whichever of fade-in/fade-out is currently darker wins (see DrawVideoFrame's comment -- same combined-darkness approach,
+        // kept in sync so both render paths look the same)
+        int videoDarkness = videoFadeIn > videoFadeOut ? videoFadeIn : videoFadeOut;
+        if (videoDarkness > 255)
+            videoDarkness = 255;
+        const int videoFade = 255 - videoDarkness;
         SDL_SetTextureColorMod(Engine.videoBuffer, videoFade, videoFade, videoFade);
 
         SDL_RenderCopy(Engine.renderer, Engine.videoBuffer, NULL, &videoDst);

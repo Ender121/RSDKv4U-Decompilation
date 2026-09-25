@@ -13,10 +13,16 @@ THEORAPLAY_Io callbacks;
 byte videoData    = 0;
 int videoFilePos  = 0;
 bool videoPlaying = 0;
+bool videoTouchHeld = false; // tracks whether the screen was already being touched, so we can require a fresh tap to skip
 int vidFrameMS    = 0;
 int vidBaseticks  = 0;
 
 bool videoSkipped = false;
+// Dedicated to the video only -- kept separate from the engine's shared screen-fade globals (fadeMode/fadeR/G/B/A, set by the
+// script-facing SetScreenFade) so a script fading the screen right before/after a video (as Start.txt does) can never interact
+// with the video's own fade in/out
+int videoFadeIn  = 0; // 0..255, counts DOWN from 255 to 0 over the first ~32 frames: the video brightens in
+int videoFadeOut = 0; // 0..255, counts UP from 0 once a skip/natural end is detected: the video darkens out
 
 static long videoRead(THEORAPLAY_Io *io, void *buf, long buflen)
 {
@@ -98,7 +104,15 @@ void PlayVideoFile(char *filePath)
         videoPlaying = true;
         trackID      = TRACK_COUNT - 1;
 
+        // Seed with whatever the screen is doing right now (e.g. still held from the tap that started this scene) so that
+        // touch isn't mistaken for a fresh tap-to-skip until the player actually lifts their finger and taps again
+        videoTouchHeld = false;
+        for (int t = 0; t < 8; ++t)
+            videoTouchHeld |= touchDown[t] != 0;
+
         videoSkipped    = false;
+        videoFadeIn     = 0xFF;
+        videoFadeOut    = 0;
         Engine.gameMode = ENGINE_VIDEOWAIT;
     }
     else {
@@ -164,27 +178,33 @@ int ProcessVideo()
         CheckKeyPress(&keyPress);
 
         // A tap/click anywhere on the screen skips the video too, not just pressing A -- this is the RSDKv4 Plus (Origins) behaviour,
-        // rather than RSDKv4-V's, which only responds to the A button
+        // rather than RSDKv4-V's, which only responds to the A button. Only a FRESH tap counts (touchDown was false last frame, true this
+        // frame) -- otherwise a touch still held from whatever screen led into this video (e.g. the tap that started the game) would
+        // read as a skip the instant the video starts, before the player ever meant to skip anything
         bool touched = false;
         for (int t = 0; t < 8 && !touched; ++t)
             touched = touchDown[t] != 0;
 
-        const bool skipRequested = keyPress.A || touched;
+        const bool touchSkip = touched && !videoTouchHeld;
+        videoTouchHeld        = touched;
+
+        const bool skipRequested = keyPress.A || touchSkip;
         const bool videoDone     = !THEORAPLAY_isDecoding(videoDecoder);
 
-        // Start the fade the first time either the player skips or the video plays out on its own -- a natural end fades out exactly
-        // like a skip does, instead of cutting straight to black the instant decoding finishes
-        if (!videoSkipped && (skipRequested || videoDone))
-            fadeMode = 0;
+        // Runs every frame from the start, independent of skipping: the video opens on black and brightens up over its first ~32 frames
+        if (videoFadeIn > 0)
+            videoFadeIn = (videoFadeIn < 8) ? 0 : (videoFadeIn - 8);
 
+        // Start the fade-out the first time either the player skips or the video plays out on its own -- a natural end fades out exactly
+        // like a skip does, instead of cutting straight to black the instant decoding finishes
         if (skipRequested || videoDone)
             videoSkipped = true;
 
-        if (videoSkipped && fadeMode < 0xFF) {
-            fadeMode += 8;
+        if (videoSkipped && videoFadeOut < 0xFF) {
+            videoFadeOut += 8;
         }
 
-        if (videoSkipped && fadeMode >= 0xFF) {
+        if (videoSkipped && videoFadeOut >= 0xFF) {
             StopVideoPlayback();
 
             return 1; // video finished (either played out or was skipped, faded to black either way)
@@ -255,9 +275,6 @@ void StopVideoPlayback()
         // condition that results in invalid memory accesses.
         SDL_LockAudio();
 
-        if (videoSkipped && fadeMode >= 0xFF)
-            fadeMode = 0;
-
         if (videoVidData) {
             THEORAPLAY_freeVideo(videoVidData);
             videoVidData = NULL;
@@ -326,12 +343,12 @@ void DrawVideoFrame()
     const uint *src   = (const uint *)Engine.videoBuffer->pixels;
     const int srcPitch = Engine.videoBuffer->pitch / (int)sizeof(uint);
 
-    // fade to black while the video is being skipped
-    int fade = 256;
-    if (videoSkipped) {
-        int f = fadeMode > 255 ? 255 : fadeMode;
-        fade  = 256 - f;
-    }
+    // Whichever of fade-in/fade-out is currently darker wins -- in the ordinary case only one of them is ever nonzero at a time, but this
+    // keeps things sane even if the video is skipped during its own fade-in (no pop, the two blend smoothly into each other)
+    int darkness = videoFadeIn > videoFadeOut ? videoFadeIn : videoFadeOut;
+    if (darkness > 255)
+        darkness = 255;
+    const int fade = 256 - darkness;
 
     // Fixed-point (16.16) steps replace a per-pixel divide with a per-pixel add: on a slow in-order CPU (e.g. a low-end Android phone) an
     // integer division can cost 10-20x what an add does, and this runs for every one of the ~100,000 pixels in the frame, every frame.
