@@ -54,9 +54,9 @@ void RetroGameLoop_Main(void *objPtr)
             }
 #if RETRO_USING_OPENGL
             else {
-                DrawVideoFrame();
-                TransferRetroBuffer();
-                RenderRetroBuffer(64, 160.0);
+                // Its own texture at the video's real resolution, not the small internal game-screen buffer TransferRetroBuffer/
+                // RenderRetroBuffer would downsample it into -- see DrawVideoFrameGL's comment in Video.cpp for the full picture
+                DrawVideoFrameGL();
             }
 #endif
             break;
