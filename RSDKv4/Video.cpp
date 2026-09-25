@@ -37,8 +37,14 @@ void PlayVideoFile(char *filePath)
 {
     char filepath[0x200];
 #if RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_ANDROID
-    // On these platforms the game files live in gamePath (like Data.rsdk), not relative to the working directory
-    sprintf(filepath, "%s/videos/", gamePath);
+    // On these platforms the game files live in gamePath (like Data.rsdk), not relative to the working directory. gamePath's trailing
+    // slash is inconsistent between platforms (Android's Java-side getBasePath() includes one, OSX's does not), so strip it if present
+    // before adding our own -- a doubled slash breaks fcaseopen's case-insensitive directory walk on Android/Linux.
+    int gamePathLen = StrLength(gamePath);
+    if (gamePathLen > 0 && gamePath[gamePathLen - 1] == '/')
+        gamePathLen--;
+    memcpy(filepath, gamePath, gamePathLen);
+    sprintf(filepath + gamePathLen, "/videos/");
 #else
     StrCopy(filepath, BASE_PATH "videos/");
 #endif
@@ -157,21 +163,31 @@ int ProcessVideo()
     if (videoPlaying) {
         CheckKeyPress(&keyPress);
 
+        // A tap/click anywhere on the screen skips the video too, not just pressing A -- this is the RSDKv4 Plus (Origins) behaviour,
+        // rather than RSDKv4-V's, which only responds to the A button
+        bool touched = false;
+        for (int t = 0; t < 8 && !touched; ++t)
+            touched = touchDown[t] != 0;
+
+        const bool skipRequested = keyPress.A || touched;
+        const bool videoDone     = !THEORAPLAY_isDecoding(videoDecoder);
+
+        // Start the fade the first time either the player skips or the video plays out on its own -- a natural end fades out exactly
+        // like a skip does, instead of cutting straight to black the instant decoding finishes
+        if (!videoSkipped && (skipRequested || videoDone))
+            fadeMode = 0;
+
+        if (skipRequested || videoDone)
+            videoSkipped = true;
+
         if (videoSkipped && fadeMode < 0xFF) {
             fadeMode += 8;
         }
 
-        if (keyPress.A) {
-            if (!videoSkipped)
-                fadeMode = 0;
-
-            videoSkipped = true;
-        }
-
-        if (!THEORAPLAY_isDecoding(videoDecoder) || (videoSkipped && fadeMode >= 0xFF)) {
+        if (videoSkipped && fadeMode >= 0xFF) {
             StopVideoPlayback();
 
-            return 1; // video finished
+            return 1; // video finished (either played out or was skipped, faded to black either way)
         }
 
         // Don't pause or it'll go wild
@@ -317,23 +333,36 @@ void DrawVideoFrame()
         fade  = 256 - f;
     }
 
+    // Fixed-point (16.16) steps replace a per-pixel divide with a per-pixel add: on a slow in-order CPU (e.g. a low-end Android phone) an
+    // integer division can cost 10-20x what an add does, and this runs for every one of the ~100,000 pixels in the frame, every frame.
+    const int xStep = (videoWidth << 16) / dstW;
+    const int yStep = (videoHeight << 16) / dstH;
+    int yAccum      = 0;
+
     for (int y = 0; y < dstH; ++y) {
-        const uint *row = src + (y * videoHeight / dstH) * srcPitch;
+        const uint *row = src + (yAccum >> 16) * srcPitch;
         ushort *dst     = &Engine.frameBuffer[(y + offY) * GFX_LINESIZE + offX];
+        yAccum += yStep;
 
-        for (int x = 0; x < dstW; ++x) {
-            const uint px = row[x * videoWidth / dstW];
-            int r         = (px >> 0) & 0xFF;
-            int g         = (px >> 8) & 0xFF;
-            int b         = (px >> 16) & 0xFF;
+        int xAccum = 0;
+        if (fade < 256) {
+            for (int x = 0; x < dstW; ++x) {
+                const uint px = row[xAccum >> 16];
+                xAccum += xStep;
+                int r = ((px >> 0) & 0xFF) * fade >> 8;
+                int g = ((px >> 8) & 0xFF) * fade >> 8;
+                int b = ((px >> 16) & 0xFF) * fade >> 8;
 
-            if (fade < 256) {
-                r = (r * fade) >> 8;
-                g = (g * fade) >> 8;
-                b = (b * fade) >> 8;
+                dst[x] = (ushort)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
             }
+        }
+        else {
+            for (int x = 0; x < dstW; ++x) {
+                const uint px = row[xAccum >> 16];
+                xAccum += xStep;
 
-            dst[x] = (ushort)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+                dst[x] = (ushort)((((px >> 0) & 0xF8) << 8) | (((px >> 8) & 0xFC) << 3) | (((px >> 16) & 0xF8) >> 3));
+            }
         }
     }
 }
