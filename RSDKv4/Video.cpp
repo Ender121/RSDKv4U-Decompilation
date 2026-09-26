@@ -13,7 +13,9 @@ THEORAPLAY_Io callbacks;
 byte videoData    = 0;
 int videoFilePos  = 0;
 bool videoPlaying = 0;
-bool videoTouchHeld = false; // tracks whether the screen was already being touched, so we can require a fresh tap to skip
+int videoTouchReleaseFrames = 0; // consecutive frames with no touch seen since the video started; skip only arms once this
+                                  // reaches VIDEO_TOUCH_RELEASE_FRAMES, so a touch still held from whatever led into the video
+                                  // (or a single noisy frame where a release gets reported late) can never be mistaken for a tap
 int vidFrameMS    = 0;
 int vidBaseticks  = 0;
 
@@ -104,11 +106,7 @@ void PlayVideoFile(char *filePath)
         videoPlaying = true;
         trackID      = TRACK_COUNT - 1;
 
-        // Seed with whatever the screen is doing right now (e.g. still held from the tap that started this scene) so that
-        // touch isn't mistaken for a fresh tap-to-skip until the player actually lifts their finger and taps again
-        videoTouchHeld = false;
-        for (int t = 0; t < 8; ++t)
-            videoTouchHeld |= touchDown[t] != 0;
+        videoTouchReleaseFrames = 0;
 
         videoSkipped    = false;
         videoFadeIn     = 0xFF;
@@ -185,8 +183,18 @@ int ProcessVideo()
         for (int t = 0; t < 8 && !touched; ++t)
             touched = touchDown[t] != 0;
 
-        const bool touchSkip = touched && !videoTouchHeld;
-        videoTouchHeld        = touched;
+        // ~3 frames (50ms @ 60fps): long enough to absorb a touch-release that gets reported a frame late, short enough nobody notices
+        // the wait once they actually do lift their finger
+        const int VIDEO_TOUCH_RELEASE_FRAMES = 3;
+
+        bool touchSkip = false;
+        if (touched) {
+            if (videoTouchReleaseFrames >= VIDEO_TOUCH_RELEASE_FRAMES)
+                touchSkip = true; // a real release was already confirmed -- this is a fresh tap
+        }
+        else if (videoTouchReleaseFrames < VIDEO_TOUCH_RELEASE_FRAMES) {
+            videoTouchReleaseFrames++;
+        }
 
         const bool skipRequested = keyPress.A || touchSkip;
         const bool videoDone     = !THEORAPLAY_isDecoding(videoDecoder);
@@ -212,52 +220,57 @@ int ProcessVideo()
 
         // Don't pause or it'll go wild
         if (videoPlaying) {
-            const Uint32 now = (SDL_GetTicks() - vidBaseticks);
+            // Once we've decided to fade out -- whether the video reached its real last frame or the player skipped early -- stop pulling
+            // new frames from the decoder entirely. Engine.videoBuffer is left holding whatever was last copied into it, so the fade plays
+            // out over that held frame instead of the video continuing to advance underneath it
+            if (!videoSkipped) {
+                const Uint32 now = (SDL_GetTicks() - vidBaseticks);
 
-            if (!videoVidData)
-                videoVidData = THEORAPLAY_getVideo(videoDecoder);
+                if (!videoVidData)
+                    videoVidData = THEORAPLAY_getVideo(videoDecoder);
 
-            // Play video frames when it's time.
-            if (videoVidData && (videoVidData->playms <= now)) {
-                if (vidFrameMS && ((now - videoVidData->playms) >= vidFrameMS)) {
+                // Play video frames when it's time.
+                if (videoVidData && (videoVidData->playms <= now)) {
+                    if (vidFrameMS && ((now - videoVidData->playms) >= vidFrameMS)) {
 
-                    // Skip frames to catch up, but keep track of the last one+
-                    //  in case we catch up to a series of dupe frames, which
-                    //  means we'd have to draw that final frame and then wait for
-                    //  more.
+                        // Skip frames to catch up, but keep track of the last one+
+                        //  in case we catch up to a series of dupe frames, which
+                        //  means we'd have to draw that final frame and then wait for
+                        //  more.
 
-                    const THEORAPLAY_VideoFrame *last = videoVidData;
-                    while ((videoVidData = THEORAPLAY_getVideo(videoDecoder)) != NULL) {
-                        THEORAPLAY_freeVideo(last);
-                        last = videoVidData;
-                        if ((now - videoVidData->playms) < vidFrameMS)
-                            break;
+                        const THEORAPLAY_VideoFrame *last = videoVidData;
+                        while ((videoVidData = THEORAPLAY_getVideo(videoDecoder)) != NULL) {
+                            THEORAPLAY_freeVideo(last);
+                            last = videoVidData;
+                            if ((now - videoVidData->playms) < vidFrameMS)
+                                break;
+                        }
+
+                        if (!videoVidData)
+                            videoVidData = last;
                     }
 
-                    if (!videoVidData)
-                        videoVidData = last;
+                    // do nothing; we're far behind and out of options.
+                    if (!videoVidData) {
+                        // video lagging uh oh
+                    }
+
+                    int half_w     = videoVidData->width / 2;
+                    const Uint8 *y = (const Uint8 *)videoVidData->pixels;
+                    const Uint8 *u = y + (videoVidData->width * videoVidData->height);
+                    const Uint8 *v = u + (half_w * (videoVidData->height / 2));
+
+    #if RETRO_USING_SDL2 && !RETRO_USING_OPENGL
+        SDL_UpdateYUVTexture(Engine.videoBuffer, NULL, y, videoVidData->width, u, half_w, v, half_w);
+    #endif
+    #if RETRO_USING_SDL1 || (RETRO_USING_SDL2 && RETRO_USING_OPENGL)
+        uint *videoFrameBuffer = (uint *)Engine.videoBuffer->pixels;
+        memcpy(videoFrameBuffer, videoVidData->pixels, videoVidData->width * videoVidData->height * sizeof(uint));
+    #endif
+
+                    THEORAPLAY_freeVideo(videoVidData);
+                    videoVidData = NULL;
                 }
-
-                // do nothing; we're far behind and out of options.
-                if (!videoVidData) {
-                    // video lagging uh oh
-                }
-
-                int half_w     = videoVidData->width / 2;
-                const Uint8 *y = (const Uint8 *)videoVidData->pixels;
-                const Uint8 *u = y + (videoVidData->width * videoVidData->height);
-                const Uint8 *v = u + (half_w * (videoVidData->height / 2));
-
-#if RETRO_USING_SDL2 && !RETRO_USING_OPENGL
-    SDL_UpdateYUVTexture(Engine.videoBuffer, NULL, y, videoVidData->width, u, half_w, v, half_w);
-#endif
-#if RETRO_USING_SDL1 || (RETRO_USING_SDL2 && RETRO_USING_OPENGL)
-    uint *videoFrameBuffer = (uint *)Engine.videoBuffer->pixels;
-    memcpy(videoFrameBuffer, videoVidData->pixels, videoVidData->width * videoVidData->height * sizeof(uint));
-#endif
-
-                THEORAPLAY_freeVideo(videoVidData);
-                videoVidData = NULL;
             }
 
             return 2; // its playing as expected
