@@ -212,52 +212,57 @@ int ProcessVideo()
 
         // Don't pause or it'll go wild
         if (videoPlaying) {
-            const Uint32 now = (SDL_GetTicks() - vidBaseticks);
+            // Once we've decided to fade out -- whether the video reached its real last frame or the player skipped early -- stop pulling
+            // new frames from the decoder entirely. Engine.videoBuffer is left holding whatever was last copied into it, so the fade plays
+            // out over that held frame instead of the video continuing to advance underneath it
+            if (!videoSkipped) {
+                const Uint32 now = (SDL_GetTicks() - vidBaseticks);
 
-            if (!videoVidData)
-                videoVidData = THEORAPLAY_getVideo(videoDecoder);
+                if (!videoVidData)
+                    videoVidData = THEORAPLAY_getVideo(videoDecoder);
 
-            // Play video frames when it's time.
-            if (videoVidData && (videoVidData->playms <= now)) {
-                if (vidFrameMS && ((now - videoVidData->playms) >= vidFrameMS)) {
+                // Play video frames when it's time.
+                if (videoVidData && (videoVidData->playms <= now)) {
+                    if (vidFrameMS && ((now - videoVidData->playms) >= vidFrameMS)) {
 
-                    // Skip frames to catch up, but keep track of the last one+
-                    //  in case we catch up to a series of dupe frames, which
-                    //  means we'd have to draw that final frame and then wait for
-                    //  more.
+                        // Skip frames to catch up, but keep track of the last one+
+                        //  in case we catch up to a series of dupe frames, which
+                        //  means we'd have to draw that final frame and then wait for
+                        //  more.
 
-                    const THEORAPLAY_VideoFrame *last = videoVidData;
-                    while ((videoVidData = THEORAPLAY_getVideo(videoDecoder)) != NULL) {
-                        THEORAPLAY_freeVideo(last);
-                        last = videoVidData;
-                        if ((now - videoVidData->playms) < vidFrameMS)
-                            break;
+                        const THEORAPLAY_VideoFrame *last = videoVidData;
+                        while ((videoVidData = THEORAPLAY_getVideo(videoDecoder)) != NULL) {
+                            THEORAPLAY_freeVideo(last);
+                            last = videoVidData;
+                            if ((now - videoVidData->playms) < vidFrameMS)
+                                break;
+                        }
+
+                        if (!videoVidData)
+                            videoVidData = last;
                     }
 
-                    if (!videoVidData)
-                        videoVidData = last;
+                    // do nothing; we're far behind and out of options.
+                    if (!videoVidData) {
+                        // video lagging uh oh
+                    }
+
+                    int half_w     = videoVidData->width / 2;
+                    const Uint8 *y = (const Uint8 *)videoVidData->pixels;
+                    const Uint8 *u = y + (videoVidData->width * videoVidData->height);
+                    const Uint8 *v = u + (half_w * (videoVidData->height / 2));
+
+    #if RETRO_USING_SDL2 && !RETRO_USING_OPENGL
+        SDL_UpdateYUVTexture(Engine.videoBuffer, NULL, y, videoVidData->width, u, half_w, v, half_w);
+    #endif
+    #if RETRO_USING_SDL1 || (RETRO_USING_SDL2 && RETRO_USING_OPENGL)
+        uint *videoFrameBuffer = (uint *)Engine.videoBuffer->pixels;
+        memcpy(videoFrameBuffer, videoVidData->pixels, videoVidData->width * videoVidData->height * sizeof(uint));
+    #endif
+
+                    THEORAPLAY_freeVideo(videoVidData);
+                    videoVidData = NULL;
                 }
-
-                // do nothing; we're far behind and out of options.
-                if (!videoVidData) {
-                    // video lagging uh oh
-                }
-
-                int half_w     = videoVidData->width / 2;
-                const Uint8 *y = (const Uint8 *)videoVidData->pixels;
-                const Uint8 *u = y + (videoVidData->width * videoVidData->height);
-                const Uint8 *v = u + (half_w * (videoVidData->height / 2));
-
-#if RETRO_USING_SDL2 && !RETRO_USING_OPENGL
-    SDL_UpdateYUVTexture(Engine.videoBuffer, NULL, y, videoVidData->width, u, half_w, v, half_w);
-#endif
-#if RETRO_USING_SDL1 || (RETRO_USING_SDL2 && RETRO_USING_OPENGL)
-    uint *videoFrameBuffer = (uint *)Engine.videoBuffer->pixels;
-    memcpy(videoFrameBuffer, videoVidData->pixels, videoVidData->width * videoVidData->height * sizeof(uint));
-#endif
-
-                THEORAPLAY_freeVideo(videoVidData);
-                videoVidData = NULL;
             }
 
             return 2; // its playing as expected
@@ -468,4 +473,4 @@ void DrawVideoFrame()
         }
     }
 }
-#end
+#endif
