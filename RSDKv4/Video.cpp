@@ -42,28 +42,57 @@ static void videoClose(THEORAPLAY_Io *io)
 
 void PlayVideoFile(char *filePath)
 {
-    char filepath[0x200];
-#if RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_ANDROID
-    // On these platforms the game files live in gamePath (like Data.rsdk), not relative to the working directory. gamePath's trailing
-    // slash is inconsistent between platforms (Android's Java-side getBasePath() includes one, OSX's does not), so strip it if present
-    // before adding our own -- a doubled slash breaks fcaseopen's case-insensitive directory walk on Android/Linux.
-    int gamePathLen = StrLength(gamePath);
-    if (gamePathLen > 0 && gamePath[gamePathLen - 1] == '/')
-        gamePathLen--;
-    memcpy(filepath, gamePath, gamePathLen);
-    sprintf(filepath + gamePathLen, "/Videos/");
-#else
-    StrCopy(filepath, BASE_PATH "Videos/");
-#endif
-
     int len = StrLength(filePath);
 
     if (StrComp(filePath + ((size_t)len - 2), "us")) {
         filePath[len - 2] = 0;
     }
 
-    StrAdd(filepath, filePath);
-    StrAdd(filepath, ".ogv");
+    // Built as a relative path first ("Videos/Opening.ogv") so a mod can override it by that name -- the same lookup Reader.cpp::LoadFile
+    // already does for every other asset type. Video was the one asset type that skipped this check entirely.
+    char relPath[0x180];
+    StrCopy(relPath, "Videos/");
+    StrAdd(relPath, filePath);
+    StrAdd(relPath, ".ogv");
+
+    char filepath[0x200];
+    bool addPath = true;
+
+#if RETRO_USE_MOD_LOADER
+    char pathLower[0x180];
+    memset(pathLower, 0, sizeof(pathLower));
+    for (int c = 0; c < (int)strlen(relPath); ++c)
+        pathLower[c] = tolower(relPath[c]);
+
+    for (int m = activeMod != -1 ? activeMod : 0; m < (int)modList.size(); ++m) {
+        if (modList[m].active) {
+            std::map<std::string, std::string>::const_iterator iter = modList[m].fileMap.find(pathLower);
+            if (iter != modList[m].fileMap.cend()) {
+                StrCopy(filepath, iter->second.c_str());
+                addPath = false;
+                break;
+            }
+        }
+        if (activeMod != -1)
+            break;
+    }
+#endif
+
+    if (addPath) {
+#if RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_ANDROID
+        // On these platforms the game files live in gamePath (like Data.rsdk), not relative to the working directory. gamePath's trailing
+        // slash is inconsistent between platforms (Android's Java-side getBasePath() includes one, OSX's does not), so strip it if present
+        // before adding our own -- a doubled slash breaks fcaseopen's case-insensitive directory walk on Android/Linux.
+        int gamePathLen = StrLength(gamePath);
+        if (gamePathLen > 0 && gamePath[gamePathLen - 1] == '/')
+            gamePathLen--;
+        memcpy(filepath, gamePath, gamePathLen);
+        sprintf(filepath + gamePathLen, "/%s", relPath);
+#else
+        StrCopy(filepath, BASE_PATH);
+        StrAdd(filepath, relPath);
+#endif
+    }
 
     FileIO *file = fOpen(filepath, "rb");
     if (file) {
@@ -335,6 +364,8 @@ void CreateVideoTexture(int width, int height)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 #endif
