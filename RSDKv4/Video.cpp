@@ -23,6 +23,7 @@ bool videoSkipped = false;
 // with the video's own fade in/out
 int videoFadeIn  = 0; // 0..255, counts DOWN from 255 to 0 over the first ~32 frames: the video brightens in
 int videoFadeOut = 0; // 0..255, counts UP from 0 once a skip/natural end is detected: the video darkens out
+int videoPrevRefreshRate = 0; // Engine.refreshRate from just before we throttled it down to the video's own fps; restored once it ends
 
 static long videoRead(THEORAPLAY_Io *io, void *buf, long buflen)
 {
@@ -113,6 +114,17 @@ void PlayVideoFile(char *filePath)
         videoSkipped    = false;
         videoFadeIn     = 0xFF;
         videoFadeOut    = 0;
+
+        // The whole engine loop normally runs at Engine.refreshRate (60 by default), via RetroEngine::Run()'s own frame timer. Nothing
+        // needs to happen faster than the video's own frame rate while it plays -- there's no gameplay to update (ProcessObjects only
+        // runs during ENGINE_MAINGAME) and DrawVideoFrameGL has nothing new to show between the video's own frames -- so throttling the
+        // loop itself down to match saves the whole render pass each skipped tick, not just the redundant texture upload
+        videoPrevRefreshRate = Engine.refreshRate;
+        int videoTargetRate  = (int)(videoVidData->fps + 0.5);
+        if (videoTargetRate >= 1)
+            Engine.refreshRate = videoTargetRate;
+        // else: fps unknown/zero -- leave Engine.refreshRate untouched rather than risk a bad value
+
         Engine.gameMode = ENGINE_VIDEOWAIT;
     }
     else {
