@@ -50,7 +50,8 @@ void RetroGameLoop_Main(void *objPtr)
 
         case ENGINE_VIDEOWAIT:
             if (ProcessVideo() != 2) { // 1: video finished / skipped, 0: nothing is actually playing
-                Engine.gameMode = ENGINE_MAINGAME;
+                Engine.refreshRate = videoPrevRefreshRate; // undo the throttle PlayVideoFile applied for the video's own fps
+                Engine.gameMode    = ENGINE_MAINGAME;
             }
 #if RETRO_USING_OPENGL
             else {
