@@ -13,17 +13,10 @@ THEORAPLAY_Io callbacks;
 byte videoData    = 0;
 int videoFilePos  = 0;
 bool videoPlaying = 0;
-bool videoTouchHeld = false; // tracks whether the screen was already being touched, so we can require a fresh tap to skip
 int vidFrameMS    = 0;
 int vidBaseticks  = 0;
 
 bool videoSkipped = false;
-// Dedicated to the video only -- kept separate from the engine's shared screen-fade globals (fadeMode/fadeR/G/B/A, set by the
-// script-facing SetScreenFade) so a script fading the screen right before/after a video (as Start.txt does) can never interact
-// with the video's own fade in/out
-int videoFadeIn  = 0; // 0..255, counts DOWN from 255 to 0 over the first ~32 frames: the video brightens in
-int videoFadeOut = 0; // 0..255, counts UP from 0 once a skip/natural end is detected: the video darkens out
-int videoPrevRefreshRate = 0; // Engine.refreshRate from just before we throttled it down to the video's own fps; restored once it ends
 
 static long videoRead(THEORAPLAY_Io *io, void *buf, long buflen)
 {
@@ -42,19 +35,8 @@ static void videoClose(THEORAPLAY_Io *io)
 
 void PlayVideoFile(char *filePath)
 {
-    char filepath[0x200];
-#if RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_ANDROID
-    // On these platforms the game files live in gamePath (like Data.rsdk), not relative to the working directory. gamePath's trailing
-    // slash is inconsistent between platforms (Android's Java-side getBasePath() includes one, OSX's does not), so strip it if present
-    // before adding our own -- a doubled slash breaks fcaseopen's case-insensitive directory walk on Android/Linux.
-    int gamePathLen = StrLength(gamePath);
-    if (gamePathLen > 0 && gamePath[gamePathLen - 1] == '/')
-        gamePathLen--;
-    memcpy(filepath, gamePath, gamePathLen);
-    sprintf(filepath + gamePathLen, "/Videos/");
-#else
-    StrCopy(filepath, BASE_PATH "Videos/");
-#endif
+    char filepath[0x100];
+    StrCopy(filepath, BASE_PATH "videos/");
 
     int len = StrLength(filePath);
 
@@ -105,26 +87,7 @@ void PlayVideoFile(char *filePath)
         videoPlaying = true;
         trackID      = TRACK_COUNT - 1;
 
-        // Seed with whatever the screen is doing right now (e.g. still held from the tap that started this scene) so that
-        // touch isn't mistaken for a fresh tap-to-skip until the player actually lifts their finger and taps again
-        videoTouchHeld = false;
-        for (int t = 0; t < 8; ++t)
-            videoTouchHeld |= touchDown[t] != 0;
-
         videoSkipped    = false;
-        videoFadeIn     = 0xFF;
-        videoFadeOut    = 0;
-
-        // The whole engine loop normally runs at Engine.refreshRate (60 by default), via RetroEngine::Run()'s own frame timer. Nothing
-        // needs to happen faster than the video's own frame rate while it plays -- there's no gameplay to update (ProcessObjects only
-        // runs during ENGINE_MAINGAME) and DrawVideoFrameGL has nothing new to show between the video's own frames -- so throttling the
-        // loop itself down to match saves the whole render pass each skipped tick, not just the redundant texture upload
-        videoPrevRefreshRate = Engine.refreshRate;
-        int videoTargetRate  = (int)(videoVidData->fps + 0.5);
-        if (videoTargetRate >= 1)
-            Engine.refreshRate = videoTargetRate;
-        // else: fps unknown/zero -- leave Engine.refreshRate untouched rather than risk a bad value
-
         Engine.gameMode = ENGINE_VIDEOWAIT;
     }
     else {
@@ -189,92 +152,71 @@ int ProcessVideo()
     if (videoPlaying) {
         CheckKeyPress(&keyPress);
 
-        // A tap/click anywhere on the screen skips the video too, not just pressing A -- this is the RSDKv4 Plus (Origins) behaviour,
-        // rather than RSDKv4-V's, which only responds to the A button. Only a FRESH tap counts (touchDown was false last frame, true this
-        // frame) -- otherwise a touch still held from whatever screen led into this video (e.g. the tap that started the game) would
-        // read as a skip the instant the video starts, before the player ever meant to skip anything
-        bool touched = false;
-        for (int t = 0; t < 8 && !touched; ++t)
-            touched = touchDown[t] != 0;
-
-        const bool touchSkip = touched && !videoTouchHeld;
-        videoTouchHeld        = touched;
-
-        const bool skipRequested = keyPress.A || touchSkip;
-        const bool videoDone     = !THEORAPLAY_isDecoding(videoDecoder);
-
-        // Runs every frame from the start, independent of skipping: the video opens on black and brightens up over its first ~32 frames
-        if (videoFadeIn > 0)
-            videoFadeIn = (videoFadeIn < 8) ? 0 : (videoFadeIn - 8);
-
-        // Start the fade-out the first time either the player skips or the video plays out on its own -- a natural end fades out exactly
-        // like a skip does, instead of cutting straight to black the instant decoding finishes
-        if (skipRequested || videoDone)
-            videoSkipped = true;
-
-        if (videoSkipped && videoFadeOut < 0xFF) {
-            videoFadeOut += 8;
+        if (videoSkipped && fadeMode < 0xFF) {
+            fadeMode += 8;
         }
 
-        if (videoSkipped && videoFadeOut >= 0xFF) {
+        if (keyPress.A) {
+            if (!videoSkipped)
+                fadeMode = 0;
+
+            videoSkipped = true;
+        }
+
+        if (!THEORAPLAY_isDecoding(videoDecoder) || (videoSkipped && fadeMode >= 0xFF)) {
             StopVideoPlayback();
 
-            return 1; // video finished (either played out or was skipped, faded to black either way)
+            return 1; // video finished
         }
 
         // Don't pause or it'll go wild
         if (videoPlaying) {
-            // Once we've decided to fade out -- whether the video reached its real last frame or the player skipped early -- stop pulling
-            // new frames from the decoder entirely. Engine.videoBuffer is left holding whatever was last copied into it, so the fade plays
-            // out over that held frame instead of the video continuing to advance underneath it
-            if (!videoSkipped) {
-                const Uint32 now = (SDL_GetTicks() - vidBaseticks);
+            const Uint32 now = (SDL_GetTicks() - vidBaseticks);
 
-                if (!videoVidData)
-                    videoVidData = THEORAPLAY_getVideo(videoDecoder);
+            if (!videoVidData)
+                videoVidData = THEORAPLAY_getVideo(videoDecoder);
 
-                // Play video frames when it's time.
-                if (videoVidData && (videoVidData->playms <= now)) {
-                    if (vidFrameMS && ((now - videoVidData->playms) >= vidFrameMS)) {
+            // Play video frames when it's time.
+            if (videoVidData && (videoVidData->playms <= now)) {
+                if (vidFrameMS && ((now - videoVidData->playms) >= vidFrameMS)) {
 
-                        // Skip frames to catch up, but keep track of the last one+
-                        //  in case we catch up to a series of dupe frames, which
-                        //  means we'd have to draw that final frame and then wait for
-                        //  more.
+                    // Skip frames to catch up, but keep track of the last one+
+                    //  in case we catch up to a series of dupe frames, which
+                    //  means we'd have to draw that final frame and then wait for
+                    //  more.
 
-                        const THEORAPLAY_VideoFrame *last = videoVidData;
-                        while ((videoVidData = THEORAPLAY_getVideo(videoDecoder)) != NULL) {
-                            THEORAPLAY_freeVideo(last);
-                            last = videoVidData;
-                            if ((now - videoVidData->playms) < vidFrameMS)
-                                break;
-                        }
-
-                        if (!videoVidData)
-                            videoVidData = last;
+                    const THEORAPLAY_VideoFrame *last = videoVidData;
+                    while ((videoVidData = THEORAPLAY_getVideo(videoDecoder)) != NULL) {
+                        THEORAPLAY_freeVideo(last);
+                        last = videoVidData;
+                        if ((now - videoVidData->playms) < vidFrameMS)
+                            break;
                     }
 
-                    // do nothing; we're far behind and out of options.
-                    if (!videoVidData) {
-                        // video lagging uh oh
-                    }
-
-                    int half_w     = videoVidData->width / 2;
-                    const Uint8 *y = (const Uint8 *)videoVidData->pixels;
-                    const Uint8 *u = y + (videoVidData->width * videoVidData->height);
-                    const Uint8 *v = u + (half_w * (videoVidData->height / 2));
-
-    #if RETRO_USING_SDL2 && !RETRO_USING_OPENGL
-        SDL_UpdateYUVTexture(Engine.videoBuffer, NULL, y, videoVidData->width, u, half_w, v, half_w);
-    #endif
-    #if RETRO_USING_SDL1 || (RETRO_USING_SDL2 && RETRO_USING_OPENGL)
-        uint *videoFrameBuffer = (uint *)Engine.videoBuffer->pixels;
-        memcpy(videoFrameBuffer, videoVidData->pixels, videoVidData->width * videoVidData->height * sizeof(uint));
-    #endif
-
-                    THEORAPLAY_freeVideo(videoVidData);
-                    videoVidData = NULL;
+                    if (!videoVidData)
+                        videoVidData = last;
                 }
+
+                // do nothing; we're far behind and out of options.
+                if (!videoVidData) {
+                    // video lagging uh oh
+                }
+
+                int half_w     = videoVidData->width / 2;
+                const Uint8 *y = (const Uint8 *)videoVidData->pixels;
+                const Uint8 *u = y + (videoVidData->width * videoVidData->height);
+                const Uint8 *v = u + (half_w * (videoVidData->height / 2));
+
+#if RETRO_USING_SDL2 && !RETRO_USING_OPENGL
+    SDL_UpdateYUVTexture(Engine.videoBuffer, NULL, y, videoVidData->width, u, half_w, v, half_w);
+#endif
+#if RETRO_USING_SDL1 || (RETRO_USING_SDL2 && RETRO_USING_OPENGL)
+    uint *videoFrameBuffer = (uint *)Engine.videoBuffer->pixels;
+    memcpy(videoFrameBuffer, videoVidData->pixels, videoVidData->width * videoVidData->height * sizeof(uint));
+#endif
+
+                THEORAPLAY_freeVideo(videoVidData);
+                videoVidData = NULL;
             }
 
             return 2; // its playing as expected
@@ -292,6 +234,9 @@ void StopVideoPlayback()
         // condition that results in invalid memory accesses.
         SDL_LockAudio();
 
+        if (videoSkipped && fadeMode >= 0xFF)
+            fadeMode = 0;
+
         if (videoVidData) {
             THEORAPLAY_freeVideo(videoVidData);
             videoVidData = NULL;
@@ -308,37 +253,6 @@ void StopVideoPlayback()
     }
 }
 
-#if RETRO_USING_OPENGL
-// Video gets one dedicated, permanently-reserved texture slot (the very last one -- nothing else in the engine claims a slot by counting
-// down from the end, so this can never collide with a sprite sheet a script loads) sized to the video's OWN resolution, completely
-// separate from the small textureList[0] "RetroBuffer" the rest of the game draws into. That's what lets the video display at its real
-// resolution instead of being downsampled into the game's internal (e.g. 424x240) screen buffer first.
-#define VIDEO_TEXTURE_SLOT (TEXTURE_COUNT - 1)
-
-void CreateVideoTexture(int width, int height)
-{
-    TextureInfo *texture = &textureList[VIDEO_TEXTURE_SLOT];
-
-    if (texture->id)
-        glDeleteTextures(1, &texture->id);
-
-    StrCopy(texture->fileName, "__RSDKv4U_VideoTexture");
-    texture->width   = width;
-    texture->height  = height;
-    texture->format  = TEXFMT_RGBA8888;
-    texture->widthN  = 1.0f / width;
-    texture->heightN = 1.0f / height;
-
-    glGenTextures(1, &texture->id);
-    glBindTexture(GL_TEXTURE_2D, texture->id);
-    // nullptr: just reserves the storage. The pixels are streamed in every frame afterwards via glTexSubImage2D (see DrawVideoFrameGL)
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
-}
-#endif
-
 void SetupVideoBuffer(int width, int height)
 {
 #if RETRO_USING_SDL1 || (RETRO_USING_SDL2 && RETRO_USING_OPENGL)
@@ -350,10 +264,6 @@ void SetupVideoBuffer(int width, int height)
 
     if (!Engine.videoBuffer)
         PrintLog("Failed to create video buffer!");
-
-#if RETRO_USING_OPENGL
-    CreateVideoTexture(width, height);
-#endif
 }
 
 void CloseVideoBuffer()
@@ -370,56 +280,6 @@ void CloseVideoBuffer()
 }
 
 #if RETRO_USING_OPENGL
-// Draws the video at its own native resolution, via its own dedicated texture (see CreateVideoTexture) -- completely separate from the
-// small internal game-screen buffer that DrawVideoFrame (below) downsamples into. This is the OpenGL-path equivalent of DrawVideoFrame;
-// RetroGameLoop's ENGINE_VIDEOWAIT case calls one or the other depending on the render path, never both.
-void DrawVideoFrameGL()
-{
-    if (!videoPlaying || !Engine.videoBuffer || videoWidth <= 0 || videoHeight <= 0)
-        return;
-
-    // Stream this frame's pixels into the texture. Same RGBA8 byte order SDL_CreateRGBSurface was given in SetupVideoBuffer, so this is a
-    // straight copy -- no channel reordering needed
-    TextureInfo *texture = &textureList[VIDEO_TEXTURE_SLOT];
-    glBindTexture(GL_TEXTURE_2D, texture->id);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, videoWidth, videoHeight, GL_RGBA, GL_UNSIGNED_BYTE, Engine.videoBuffer->pixels);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    // Same aspect-preserving fit as DrawVideoFrame, just kept in floats here since RenderImage takes float scale factors rather than
-    // integer destination pixels
-    int dstW = SCREEN_XSIZE;
-    int dstH = SCREEN_YSIZE;
-    if (dstW * videoHeight > dstH * videoWidth)
-        dstW = dstH * videoWidth / videoHeight; // video is narrower than the screen: pillarbox
-    else
-        dstH = dstW * videoHeight / videoWidth; // video is wider than the screen: letterbox
-
-    if (dstW <= 0 || dstH <= 0)
-        return;
-
-    // Same combined fade-in/fade-out darkness as DrawVideoFrame, applied here as a vertex color tint (RenderImage multiplies the
-    // texture's pixels by vertexR/G/B) instead of baking it into the pixels, since we're not touching the pixels ourselves this time
-    int darkness = videoFadeIn > videoFadeOut ? videoFadeIn : videoFadeOut;
-    if (darkness > 255)
-        darkness = 255;
-    const byte tint = (byte)(256 - darkness > 255 ? 255 : 256 - darkness);
-    vertexR = tint;
-    vertexG = tint;
-    vertexB = tint;
-
-    // x=0,y=0 is screen center in this coordinate space (see retroVertexList in Drawing.cpp for the same convention). Anchoring on the
-    // video's own center (pivotX/Y) and scaling from there keeps the result centered exactly like the letterboxing above intends
-    RenderImage(0.0f, 0.0f, 160.0f, (float)dstW / videoWidth, (float)dstH / videoHeight, videoWidth / 2.0f, videoHeight / 2.0f,
-                (float)videoWidth, (float)videoHeight, 0.0f, 0.0f, 255, VIDEO_TEXTURE_SLOT);
-
-    // Don't leave the tint set for whatever draws next
-    vertexR = 0xFF;
-    vertexG = 0xFF;
-    vertexB = 0xFF;
-}
-#endif
-
-#if RETRO_USING_OPENGL || RETRO_USING_SDL1
 // Converts the latest decoded video frame (RGBA surface in Engine.videoBuffer) into the engine's 16-bit (RGB565) frame buffer, letterboxed to
 // keep the video's aspect ratio. The regular TransferRetroBuffer()/RenderRetroBuffer() path then presents it like any other frame.
 void DrawVideoFrame()
@@ -445,43 +305,30 @@ void DrawVideoFrame()
     const uint *src   = (const uint *)Engine.videoBuffer->pixels;
     const int srcPitch = Engine.videoBuffer->pitch / (int)sizeof(uint);
 
-    // Whichever of fade-in/fade-out is currently darker wins -- in the ordinary case only one of them is ever nonzero at a time, but this
-    // keeps things sane even if the video is skipped during its own fade-in (no pop, the two blend smoothly into each other)
-    int darkness = videoFadeIn > videoFadeOut ? videoFadeIn : videoFadeOut;
-    if (darkness > 255)
-        darkness = 255;
-    const int fade = 256 - darkness;
-
-    // Fixed-point (16.16) steps replace a per-pixel divide with a per-pixel add: on a slow in-order CPU (e.g. a low-end Android phone) an
-    // integer division can cost 10-20x what an add does, and this runs for every one of the ~100,000 pixels in the frame, every frame.
-    const int xStep = (videoWidth << 16) / dstW;
-    const int yStep = (videoHeight << 16) / dstH;
-    int yAccum      = 0;
+    // fade to black while the video is being skipped
+    int fade = 256;
+    if (videoSkipped) {
+        int f = fadeMode > 255 ? 255 : fadeMode;
+        fade  = 256 - f;
+    }
 
     for (int y = 0; y < dstH; ++y) {
-        const uint *row = src + (yAccum >> 16) * srcPitch;
+        const uint *row = src + (y * videoHeight / dstH) * srcPitch;
         ushort *dst     = &Engine.frameBuffer[(y + offY) * GFX_LINESIZE + offX];
-        yAccum += yStep;
 
-        int xAccum = 0;
-        if (fade < 256) {
-            for (int x = 0; x < dstW; ++x) {
-                const uint px = row[xAccum >> 16];
-                xAccum += xStep;
-                int r = ((px >> 0) & 0xFF) * fade >> 8;
-                int g = ((px >> 8) & 0xFF) * fade >> 8;
-                int b = ((px >> 16) & 0xFF) * fade >> 8;
+        for (int x = 0; x < dstW; ++x) {
+            const uint px = row[x * videoWidth / dstW];
+            int r         = (px >> 0) & 0xFF;
+            int g         = (px >> 8) & 0xFF;
+            int b         = (px >> 16) & 0xFF;
 
-                dst[x] = (ushort)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+            if (fade < 256) {
+                r = (r * fade) >> 8;
+                g = (g * fade) >> 8;
+                b = (b * fade) >> 8;
             }
-        }
-        else {
-            for (int x = 0; x < dstW; ++x) {
-                const uint px = row[xAccum >> 16];
-                xAccum += xStep;
 
-                dst[x] = (ushort)((((px >> 0) & 0xF8) << 8) | (((px >> 8) & 0xFC) << 3) | (((px >> 16) & 0xF8) >> 3));
-            }
+            dst[x] = (ushort)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
         }
     }
 }

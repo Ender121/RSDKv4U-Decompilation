@@ -18,9 +18,6 @@ extern int vidFrameMS;
 extern int vidBaseticks;
 
 extern bool videoSkipped;
-extern int videoFadeIn;
-extern int videoFadeOut;
-extern int videoPrevRefreshRate;
 
 void PlayVideoFile(char *filePath);
 void UpdateVideoFrame();
@@ -28,12 +25,8 @@ int ProcessVideo();
 void StopVideoPlayback();
 void SetupVideoBuffer(int width, int height);
 void CloseVideoBuffer();
-#if RETRO_USING_OPENGL || RETRO_USING_SDL1
-void DrawVideoFrame();
-#endif
 #if RETRO_USING_OPENGL
-void CreateVideoTexture(int width, int height);
-void DrawVideoFrameGL();
+void DrawVideoFrame();
 #endif
 
 #endif // VIDEO_HPP
