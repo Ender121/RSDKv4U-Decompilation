@@ -548,7 +548,7 @@ const FunctionInfo functions[] = {
     FunctionInfo("Print", 3),
 
     // Video Functions
-    FunctionInfo("LoadVideo", 1),
+    FunctionInfo("LoadVideo", 2),
     FunctionInfo("NextVideoFrame", 0),
 
 #if RETRO_REV03
@@ -5524,18 +5524,20 @@ void ProcessScript(int scriptCodeStart, int jumpTableStart, byte scriptEvent)
                     PrintLog("\n");
                 endLine = true;
                 break;
+            // Video
             case FUNC_LOADVIDEO:
                 opcodeSize = 0;
-                // PauseSound();
-                StopMusic(true);
+                // LoadVideo(video, audioTrack)
+                PauseSound();
                 if (FindStringToken(scriptText, ".rsv", 1) <= -1)
-                    PlayVideoFile(scriptText); // not an rsv
+                    PlayVideoFile(scriptText, scriptEng.operands[1]); // not an rsv
                 else
                     scriptInfo->spriteSheetID = AddGraphicsFile(scriptText);
-                // ResumeSound();
+                ResumeSound();
                 break;
             case FUNC_NEXTVIDEOFRAME:
                 opcodeSize = 0;
+                // ! RSV ONLY !
                 UpdateVideoFrame();
                 break;
             }

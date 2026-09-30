@@ -2,7 +2,7 @@
 #include <string>
 
 enum VideoStatus {
-    VIDEOSTATUS_NOTPLAYING,
+    VIDEOSTATUS_NOT;PLAYING,
     VIDEOSTATUS_PLAYING_OGV,
     VIDEOSTATUS_PLAYING_RSV,
 };
@@ -24,7 +24,7 @@ int vidFrameMS    = 0;
 int vidBaseticks  = 0;
 
 bool videoSkipped = false;
-int videoTouchReleaseFrames = 0; 
+int videoTouchReleaseFrames = 0;  
 
 static long videoRead(THEORAPLAY_Io *io, void *buf, long buflen)
 {
@@ -50,8 +50,8 @@ void PlayVideoFile(char *filePath, int audioTrack)
         filePath[len - 2] = 0;
     }
 
-    StrCopy(pathBuffer, "Videos/"); 
-    StrAdd(pathBuffer, filePath);
+    StrCopy(pathBuffer, "Videos/");
+    StrAdd(pathBuffer, filePath)
     StrAdd(pathBuffer, ".ogv");
 
     bool addPath = true;
@@ -272,7 +272,8 @@ int ProcessVideo()
                         videoVidData = last;
                 }
 
-                // do nothing; we're far behind and out of options.
+                
+                    // do nothing; we're far behind and out of options.
                 if (!videoVidData) {
                     // video lagging uh oh
                 }
