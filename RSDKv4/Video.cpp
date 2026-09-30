@@ -2,7 +2,7 @@
 #include <string>
 
 enum VideoStatus {
-    VIDEOSTATUS_NOT;PLAYING,
+    VIDEOSTATUS_NOTPLAYING,
     VIDEOSTATUS_PLAYING_OGV,
     VIDEOSTATUS_PLAYING_RSV,
 };
@@ -24,7 +24,9 @@ int vidFrameMS    = 0;
 int vidBaseticks  = 0;
 
 bool videoSkipped = false;
-int videoTouchReleaseFrames = 0;  
+int videoTouchReleaseFrames = 0; // consecutive frames with no touch since the video started; a touch only counts as a skip once
+                                  // this has run a few frames -- otherwise a touch still held from starting the game/gameplay
+                                  // (touches>0 the instant the video begins) skips the video before the player ever meant to
 
 static long videoRead(THEORAPLAY_Io *io, void *buf, long buflen)
 {
@@ -50,8 +52,8 @@ void PlayVideoFile(char *filePath, int audioTrack)
         filePath[len - 2] = 0;
     }
 
-    StrCopy(pathBuffer, "Videos/");
-    StrAdd(pathBuffer, filePath)
+    StrCopy(pathBuffer, "Videos/"); // fork bridge: this fork keeps videos in Videos/ (not Data/Videos/)
+    StrAdd(pathBuffer, filePath);
     StrAdd(pathBuffer, ".ogv");
 
     bool addPath = true;
@@ -90,6 +92,7 @@ void PlayVideoFile(char *filePath, int audioTrack)
         sprintf(filepath, "%s/%s", resourcePath, pathBuffer);
 #elif RETRO_PLATFORM == RETRO_OSX || RETRO_PLATFORM == RETRO_ANDROID
         {
+            // fork bridge: gamePath may already end in '/' (Android), a doubled slash breaks fcaseopen's case-insensitive lookup
             int gamePathLen = StrLength(gamePath);
             if (gamePathLen > 0 && gamePath[gamePathLen - 1] == '/')
                 gamePathLen--;
@@ -214,11 +217,17 @@ void UpdateVideoFrame()
 int ProcessVideo()
 {
     if (videoPlaying == VIDEOSTATUS_PLAYING_OGV) {
-        CheckKeyPress(&keyPress); 
+        CheckKeyPress(&keyPress); // fork bridge: keyPress is a single InputData here (Plus has an array per device)
+
         if (videoSkipped && fadeMode < 0xFF) {
             fadeMode += 8;
         }
 
+        // ~3 frames (50ms @ 60fps): long enough that any input still held from right before the video started (the tap that triggered
+        // it, or a touch-mapped button held during gameplay) can't be mistaken for a fresh skip request; short enough nobody notices the
+        // wait once the player actually does let go. Covers both the button check and the raw touch check below -- a touch on an
+        // on-screen button likely sets inputDevice[...].press AND touches>0 at the same time, so both need the same gate or either one
+        // alone can still skip the video early.
 #if RETRO_PLATFORM == RETRO_ANDROID
         const bool anyInputHeld = (inputDevice[INPUT_BUTTONA].press || inputDevice[INPUT_START].press > 0) || touches > 0;
 #else
@@ -257,8 +266,14 @@ int ProcessVideo()
                 }
             }
             
+            // Play video frames when it's time.
             if (videoVidData && (videoVidData->playms <= now)) {
                 if (vidFrameMS && ((now - videoVidData->playms) >= vidFrameMS)) {
+
+                    // Skip frames to catch up, but keep track of the last one+
+                    //  in case we catch up to a series of dupe frames, which
+                    //  means we'd have to draw that final frame and then wait for
+                    //  more.
 
                     const THEORAPLAY_VideoFrame *last = videoVidData;
                     while ((videoVidData = THEORAPLAY_getVideo(videoDecoder)) != NULL) {
@@ -272,8 +287,7 @@ int ProcessVideo()
                         videoVidData = last;
                 }
 
-                
-                    // do nothing; we're far behind and out of options.
+                // do nothing; we're far behind and out of options.
                 if (!videoVidData) {
                     // video lagging uh oh
                 }
