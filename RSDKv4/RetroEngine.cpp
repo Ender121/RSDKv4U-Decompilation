@@ -529,14 +529,17 @@ void RetroEngine::Run()
 {
     Engine.deltaTime = 0.0f;
 
-    unsigned long long targetFreq = SDL_GetPerformanceFrequency() / Engine.refreshRate;
-    unsigned long long curTicks   = 0;
-    unsigned long long prevTicks  = 0;
+    const unsigned long long perfFreq = SDL_GetPerformanceFrequency();
+    unsigned long long curTicks       = 0;
+    unsigned long long prevTicks      = 0;
 
     while (running) {
 #if !RETRO_USE_ORIGINAL_CODE
         if (!vsync) {
-            curTicks = SDL_GetPerformanceCounter();
+            // Recomputed every iteration (not just once, like before) so a runtime change to Engine.refreshRate takes effect immediately
+            // -- see ENGINE_VIDEOWAIT, which throttles this down to the video's own frame rate while one is playing
+            const unsigned long long targetFreq = perfFreq / Engine.refreshRate;
+            curTicks                            = SDL_GetPerformanceCounter();
             if (curTicks < prevTicks + targetFreq)
                 continue;
             prevTicks = curTicks;
@@ -604,7 +607,6 @@ void RetroEngine::Run()
     }
 
     ReleaseAudioDevice();
-    StopVideoPlayback();
     ReleaseRenderDevice();
 #if !RETRO_USE_ORIGINAL_CODE
     ReleaseInputDevices();
