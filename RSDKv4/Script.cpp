@@ -517,6 +517,10 @@ const FunctionInfo functions[] = {
     FunctionInfo("ReadSaveRAM", 0),
     FunctionInfo("WriteSaveRAM", 0),
 
+    // Video Functions
+    FunctionInfo("LoadVideo", 1),
+    FunctionInfo("NextVideoFrame", 0),
+
 #if !RETRO_REV02
     FunctionInfo("LoadFontFile", 1),
     FunctionInfo("LoadTextFile", 3),
@@ -546,10 +550,6 @@ const FunctionInfo functions[] = {
     FunctionInfo("CopyObject", 3),
 #endif
     FunctionInfo("Print", 3),
-
-    // Video Functions
-    FunctionInfo("LoadVideo", 2),
-    FunctionInfo("NextVideoFrame", 0),
 
 #if RETRO_REV03
     // Extras
@@ -1028,6 +1028,8 @@ enum ScrFunc {
     FUNC_GETANIMATIONBYNAME,
     FUNC_READSAVERAM,
     FUNC_WRITESAVERAM,
+    FUNC_LOADVIDEO,
+    FUNC_NEXTVIDEOFRAME,
 #if !RETRO_REV02
     FUNC_LOADTEXTFONT,
 #endif
@@ -1051,10 +1053,6 @@ enum ScrFunc {
     FUNC_COPYOBJECT,
 #endif
     FUNC_PRINT,
-
-    // Video Functions
-    FUNC_LOADVIDEO,
-    FUNC_NEXTVIDEOFRAME,
 
 #if RETRO_REV03
     // Extras
@@ -5341,6 +5339,18 @@ void ProcessScript(int scriptCodeStart, int jumpTableStart, byte scriptEvent)
                 opcodeSize            = 0;
                 scriptEng.checkResult = WriteSaveRAMData();
                 break;
+            case FUNC_LOADVIDEO:
+                opcodeSize = 0;
+                StopMusic();
+                if (FindStringToken(scriptText, ".rsv", 1) <= -1)
+                    PlayVideoFile(scriptText); // not an rsv
+                else
+                    scriptInfo->spriteSheetID = AddGraphicsFile(scriptText);
+                break;
+            case FUNC_NEXTVIDEOFRAME:
+                opcodeSize = 0;
+                UpdateVideoFrame();
+                break;
 #if !RETRO_REV02
             case FUNC_LOADTEXTFONT: {
                 opcodeSize = 0;
@@ -5523,22 +5533,6 @@ void ProcessScript(int scriptCodeStart, int jumpTableStart, byte scriptEvent)
                 if (scriptEng.operands[2])
                     PrintLog("\n");
                 endLine = true;
-                break;
-            // Video
-            case FUNC_LOADVIDEO:
-                opcodeSize = 0;
-                // LoadVideo(video, audioTrack)
-                PauseSound();
-                if (FindStringToken(scriptText, ".rsv", 1) <= -1)
-                    PlayVideoFile(scriptText, scriptEng.operands[1]); // not an rsv
-                else
-                    scriptInfo->spriteSheetID = AddGraphicsFile(scriptText);
-                ResumeSound();
-                break;
-            case FUNC_NEXTVIDEOFRAME:
-                opcodeSize = 0;
-                // ! RSV ONLY !
-                UpdateVideoFrame();
                 break;
             }
 

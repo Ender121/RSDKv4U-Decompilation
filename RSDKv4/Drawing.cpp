@@ -39,7 +39,6 @@ bool mixFiltersOnJekyll = false;
 GLint defaultFramebuffer = -1;
 GLuint framebufferHiRes  = -1;
 GLuint renderbufferHiRes = -1;
-GLuint videoBuffer       = -1;
 #endif
 
 #if !RETRO_USE_ORIGINAL_CODE
@@ -391,27 +390,33 @@ void FlipScreen()
 
     ushort *pixels = NULL;
     if (Engine.gameMode == ENGINE_VIDEOWAIT && Engine.videoBuffer) {
-        // RSDKv4-Plus: fit the video by its aspect ratio (videoAR), copy it, then overlay the black fade driven by fadeMode
+        // size of whatever we are rendering into (the scaled target texture, or the logical screen)
         int targetW = SCREEN_XSIZE, targetH = SCREEN_YSIZE;
         if (texTarget)
             SDL_QueryTexture(texTarget, NULL, NULL, &targetW, &targetH);
 
-        SDL_Rect destScreenPosRect = { 0, 0, targetW, targetH };
-        if (float(targetW) / float(targetH) > videoAR) { // screen wider than the video: pillarbox
-            uint videoW         = uint(targetH * videoAR);
-            destScreenPosRect.x = (targetW - videoW) / 2;
-            destScreenPosRect.w = videoW;
-        }
-        else { // video wider than the screen: letterbox
-            uint videoH         = uint(float(targetW) / videoAR);
-            destScreenPosRect.y = (targetH - videoH) / 2;
-            destScreenPosRect.h = videoH;
+        // keep the video's aspect ratio (bars are black, the screen was just cleared)
+        SDL_Rect videoDst = { 0, 0, targetW, targetH };
+        if (videoWidth > 0 && videoHeight > 0) {
+            if (targetW * videoHeight > targetH * videoWidth) {
+                videoDst.w = targetH * videoWidth / videoHeight;
+                videoDst.x = (targetW - videoDst.w) / 2;
+            }
+            else {
+                videoDst.h = targetW * videoHeight / videoWidth;
+                videoDst.y = (targetH - videoDst.h) / 2;
+            }
         }
 
-        SDL_RenderCopy(Engine.renderer, Engine.videoBuffer, NULL, &destScreenPosRect);
+        // Whichever of fade-in/fade-out is currently darker wins (see DrawVideoFrame's comment -- same combined-darkness approach,
+        // kept in sync so both render paths look the same)
+        int videoDarkness = videoFadeIn > videoFadeOut ? videoFadeIn : videoFadeOut;
+        if (videoDarkness > 255)
+            videoDarkness = 255;
+        const int videoFade = 255 - videoDarkness;
+        SDL_SetTextureColorMod(Engine.videoBuffer, videoFade, videoFade, videoFade);
 
-        SDL_SetRenderDrawColor(Engine.renderer, 0, 0, 0, fadeMode);
-        SDL_RenderFillRect(Engine.renderer, NULL);
+        SDL_RenderCopy(Engine.renderer, Engine.videoBuffer, NULL, &videoDst);
     }
     else if (!drawStageGFXHQ) {
         SDL_LockTexture(Engine.screenBuffer, NULL, (void **)&pixels, &pitch);
@@ -498,12 +503,9 @@ void FlipScreen()
 #endif
 
 #if RETRO_USING_SDL1
-    if (Engine.gameMode == ENGINE_VIDEOWAIT && Engine.videoBuffer) {
-        // RSDKv4-Plus: the video surface is blitted straight to the window
-        SDL_BlitSurface(Engine.videoBuffer, NULL, Engine.windowSurface, NULL);
-        SDL_Flip(Engine.windowSurface);
-        return;
-    }
+    // draw the current video frame into the frame buffer, the regular path below scales and presents it
+    if (Engine.gameMode == ENGINE_VIDEOWAIT && Engine.videoBuffer)
+        DrawVideoFrame();
 
     ushort *px = (ushort *)Engine.screenBuffer->pixels;
     int w      = SCREEN_XSIZE * Engine.windowScale;
@@ -546,134 +548,8 @@ void FlipScreen()
 
 #endif // !RETRO_SOFTWARE_RENDER
 
-#if RETRO_USING_OPENGL
-    if (Engine.gameMode == ENGINE_VIDEOWAIT)
-        FlipScreenVideo();
-#endif
-
 #endif
 }
-void FlipScreenVideo()
-{
-#if RETRO_USING_OPENGL && (RETRO_USING_SDL1 || RETRO_USING_SDL2)
-    if (videoBuffer <= 0)
-        return;
-
-    SDL_Rect destScreenPosRect = {};
-
-    if (float(SCREEN_XSIZE) / float(SCREEN_YSIZE) > videoAR) { // If the screen is wider than the video. (Pillarboxed)
-        uint videoW         = uint(SCREEN_YSIZE * videoAR);    // This is to force Pillarboxed mode if the screen is wider than the video.
-        destScreenPosRect.x = (SCREEN_XSIZE - videoW) / 2;                 // Centers the video horizontally.
-        destScreenPosRect.w = videoW;
-
-        destScreenPosRect.y = 0;
-        destScreenPosRect.h = SCREEN_YSIZE;
-    }
-    else {
-        uint videoH = uint(float(SCREEN_XSIZE) / videoAR); // This is to force letterbox mode if the video is wider than the screen.
-        destScreenPosRect.y = (SCREEN_YSIZE - videoH) / 2;             // Centers the video vertically.
-        destScreenPosRect.h = videoH;
-
-        destScreenPosRect.x = 0;
-        destScreenPosRect.w = SCREEN_XSIZE;
-    }
-
-    GLint viewport[4] = {};
-    glGetIntegerv(GL_VIEWPORT, viewport);
-
-    glViewport(displaySettings.offsetX, 0, displaySettings.width, displaySettings.height);
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-
-#if RETRO_PLATFORM == RETRO_ANDROID
-    glOrthof(0.0f, (float)SCREEN_XSIZE, (float)SCREEN_YSIZE, 0.0f, -1.0f, 1.0f);
-#else
-    glOrtho(0.0, (double)SCREEN_XSIZE, (double)SCREEN_YSIZE, 0.0, -1.0, 1.0);
-#endif
-
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_LIGHTING);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DITHER);
-    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-
-    DrawVertex screenVerts[4] = {};
-
-    ushort indices[] = { 0, 1, 2, 1, 3, 2 };
-
-    float left   = static_cast<float>(destScreenPosRect.x);
-    float top    = static_cast<float>(destScreenPosRect.y);
-    float right  = static_cast<float>(destScreenPosRect.x + destScreenPosRect.w);
-    float bottom = static_cast<float>(destScreenPosRect.y + destScreenPosRect.h);
-
-    screenVerts[0].vertX     = left;
-    screenVerts[0].vertY     = top;
-    screenVerts[0].vertZ     = 0.0f;
-    screenVerts[0].texCoordX = 0.0f;
-    screenVerts[0].texCoordY = 0.0f;
-
-    screenVerts[1].vertX     = right;
-    screenVerts[1].vertY     = top;
-    screenVerts[1].vertZ     = 0.0f;
-    screenVerts[1].texCoordX = 1.0f;
-    screenVerts[1].texCoordY = 0.0f;
-
-    screenVerts[2].vertX     = left;
-    screenVerts[2].vertY     = bottom;
-    screenVerts[2].vertZ     = 0.0f;
-    screenVerts[2].texCoordX = 0.0f;
-    screenVerts[2].texCoordY = 1.0f;
-
-    screenVerts[3].vertX     = right;
-    screenVerts[3].vertY     = bottom;
-    screenVerts[3].vertZ     = 0.0f;
-    screenVerts[3].texCoordX = 1.0f;
-    screenVerts[3].texCoordY = 1.0f;
-
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, videoBuffer);
-    glDisable(GL_BLEND);
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-    glVertexPointer(3, GL_FLOAT, sizeof(DrawVertex), &screenVerts[0].vertX);
-    glTexCoordPointer(2, GL_FLOAT, sizeof(DrawVertex), &screenVerts[0].texCoordX);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
-
-    if (fadeMode > 0) {
-        glDisable(GL_TEXTURE_2D);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glColor4f(0.0f, 0.0f, 0.0f, fadeMode / 255.0f);
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, indices);
-        glDisable(GL_BLEND);
-        glEnable(GL_TEXTURE_2D);
-    }
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-    glDisableClientState(GL_VERTEX_ARRAY);
-
-    glMatrixMode(GL_MODELVIEW);
-    glPopMatrix();
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-    glMatrixMode(GL_MODELVIEW);
-
-    glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-    glDisable(GL_BLEND);
-    glEnable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_LIGHTING);
-    glEnable(GL_TEXTURE_2D);
-    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-#endif
-}
-
 void ReleaseRenderDevice(bool refresh)
 {
     if (!refresh) {
