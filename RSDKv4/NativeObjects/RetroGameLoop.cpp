@@ -49,10 +49,17 @@ void RetroGameLoop_Main(void *objPtr)
         case ENGINE_WAIT: break;
 
         case ENGINE_VIDEOWAIT:
-            ClearScreen(1);
-            if (ProcessVideo() == 1)
-                Engine.gameMode = ENGINE_MAINGAME;
-            FlipScreen();
+            if (ProcessVideo() != 2) { // 1: video finished / skipped, 0: nothing is actually playing
+                Engine.refreshRate = videoPrevRefreshRate; // undo the throttle PlayVideoFile applied for the video's own fps
+                Engine.gameMode    = ENGINE_MAINGAME;
+            }
+#if RETRO_USING_OPENGL
+            else {
+                // Its own texture at the video's real resolution, not the small internal game-screen buffer TransferRetroBuffer/
+                // RenderRetroBuffer would downsample it into -- see DrawVideoFrameGL's comment in Video.cpp for the full picture
+                DrawVideoFrameGL();
+            }
+#endif
             break;
 
         case ENGINE_SCRIPTERROR:
