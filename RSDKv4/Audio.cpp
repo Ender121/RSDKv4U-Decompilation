@@ -348,8 +348,8 @@ void ProcessAudioPlayback(void *userdata, Uint8 *stream, int len)
         ProcessMusicStream(mix_buffer, samples_to_do * sizeof(Sint16));
 
 #if RETRO_USING_SDL2
-        // Mix the audio of the video that is currently playing
-        if (videoPlaying && videoDecoder) {
+        // Process music being played by a ogv video
+        if (videoPlaying == 1) {
             // Fetch THEORAPLAY audio packets, and shove them into the SDL Audio Stream
             const size_t bytes_to_do = samples_to_do * sizeof(Sint16);
 
@@ -360,18 +360,20 @@ void ProcessAudioPlayback(void *userdata, Uint8 *stream, int len)
                 THEORAPLAY_freeAudio(packet);
             }
 
-            Sint16 vidBuffer[MIX_BUFFER_SAMPLES];
+            Sint16 buffer[MIX_BUFFER_SAMPLES];
 
-            // If we need more samples, assume we've reached the end of the file, and flush the audio stream so we can get more.
-            // If we were wrong and there's still more file left, there will be a gap in the audio.
+            // If we need more samples, assume we've reached the end of the file,
+            // and flush the audio stream so we can get more. If we were wrong, and
+            // there's still more file left, then there will be a gap in the audio. Sorry.
             if ((size_t)SDL_AudioStreamAvailable(ogv_stream) < bytes_to_do)
                 SDL_AudioStreamFlush(ogv_stream);
 
             // Fetch the converted audio data, which is ready for mixing.
-            int get = SDL_AudioStreamGet(ogv_stream, vidBuffer, (int)bytes_to_do);
+            int get = SDL_AudioStreamGet(ogv_stream, buffer, (int)bytes_to_do);
 
+            // Mix the converted audio data into the final output
             if (get != -1)
-                ProcessAudioMixing(mix_buffer, vidBuffer, get / sizeof(Sint16), MAX_VOLUME, 0);
+                ProcessAudioMixing(mix_buffer, buffer, get / sizeof(Sint16), bgmVolume, 0);
         }
         else {
             SDL_AudioStreamClear(ogv_stream); // Prevent leftover audio from playing at the start of the next video
