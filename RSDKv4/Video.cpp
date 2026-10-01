@@ -23,8 +23,10 @@ int videoPlaying  = 0;
 int vidFrameMS    = 0;
 int vidBaseticks  = 0;
 
-bool videoSkipped   = false;
-bool videoTouchHeld = false; // Registra si la pantalla ya estaba siendo tocada al iniciar
+bool videoSkipped = false;
+int videoTouchReleaseFrames = 0; // consecutive frames with no touch since the video started; a touch only counts as a skip once
+                                  // this has run a few frames -- otherwise a touch still held from starting the game/gameplay
+                                  // (touches>0 the instant the video begins) skips the video before the player ever meant to
 
 static long videoRead(THEORAPLAY_Io *io, void *buf, long buflen)
 {
@@ -149,12 +151,7 @@ void PlayVideoFile(char *filePath, int audioTrack)
         trackID      = TRACK_COUNT - 1;
 
         videoSkipped    = false;
-        
-        // Registrar si la pantalla ya estaba siendo tocada para requerir un toque nuevo para saltear
-        videoTouchHeld = false;
-        for (int t = 0; t < 8; ++t)
-            videoTouchHeld |= touchDown[t] != 0;
-
+        videoTouchReleaseFrames = 0;
         Engine.gameMode = ENGINE_VIDEOWAIT;
     }
     else {
@@ -220,35 +217,37 @@ void UpdateVideoFrame()
 int ProcessVideo()
 {
     if (videoPlaying == VIDEOSTATUS_PLAYING_OGV) {
-        CheckKeyPress(&keyPress);
+        CheckKeyPress(&keyPress); // fork bridge: keyPress is a single InputData here (Plus has an array per device)
 
-        // Detectar si la pantalla está siendo tocada actualmente
-        bool touched = false;
-        for (int t = 0; t < 8 && !touched; ++t)
-            touched = touchDown[t] != 0;
-
-        // Solo se considera toque válido si no venía presionado desde antes
-        const bool touchSkip = touched && !videoTouchHeld;
-        videoTouchHeld       = touched;
-
-        const bool skipRequested = keyPress.A || touchSkip;
-        const bool videoDone     = !THEORAPLAY_isDecoding(videoDecoder);
-
-        // Si se pide saltear o el video terminó, iniciar fade out
-        if (skipRequested || videoDone) {
-            if (!videoSkipped) {
-                PlaySfxByName("Menu Decide", false);
-                fadeMode = 0;
-            }
-            videoSkipped = true;
-        }
-
-        // Incrementar el oscurecimiento mientras se saltea
         if (videoSkipped && fadeMode < 0xFF) {
             fadeMode += 8;
         }
 
-        // Finalizar cuando el video deja de decodificar o cuando el fade out se completa
+        // ~3 frames (50ms @ 60fps): long enough that any input still held from right before the video started (the tap that triggered
+        // it, or a touch-mapped button held during gameplay) can't be mistaken for a fresh skip request; short enough nobody notices the
+        // wait once the player actually does let go. Covers both the button check and the raw touch check below -- a touch on an
+        // on-screen button likely sets inputDevice[...].press AND touches>0 at the same time, so both need the same gate or either one
+        // alone can still skip the video early.
+#if RETRO_PLATFORM == RETRO_ANDROID
+        const bool anyInputHeld = (inputDevice[INPUT_BUTTONA].press || inputDevice[INPUT_START].press > 0) || touches > 0;
+#else
+        const bool anyInputHeld = inputDevice[INPUT_BUTTONA].press || inputDevice[INPUT_START].press > 0;
+#endif
+
+        if (anyInputHeld && videoTouchReleaseFrames >= 3) {
+            if (!videoSkipped)
+                fadeMode = 0;
+
+            videoSkipped = true;
+        }
+        else if (!anyInputHeld && videoTouchReleaseFrames < 3) {
+            videoTouchReleaseFrames++;
+        }
+
+        if (fadeMode <= 0) {
+            PlaySfxByName("Menu Decide", false);
+        }
+
         if (!THEORAPLAY_isDecoding(videoDecoder) || (videoSkipped && fadeMode >= 0xFF)) {
             return QuitVideo();
         }
@@ -376,8 +375,8 @@ void SetupVideoBuffer(int width, int height)
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
-
-    if (!videoBuffer || !&videoBuffer || !videoVidData)
+	
+	if (!videoBuffer || !&videoBuffer || !videoVidData)
         PrintLog("Failed to create video buffer!");
 #elif RETRO_USING_SDL1
     Engine.videoBuffer = SDL_CreateRGBSurface(0, width, height, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000);
