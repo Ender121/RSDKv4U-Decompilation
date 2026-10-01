@@ -5340,7 +5340,7 @@ void ProcessScript(int scriptCodeStart, int jumpTableStart, byte scriptEvent)
                 scriptEng.checkResult = WriteSaveRAMData();
                 break;
             case FUNC_LOADVIDEO:
-                opcodeSize = 0;
+                opcodeSize            = 0;
                 StopMusic();
                 if (FindStringToken(scriptText, ".rsv", 1) <= -1)
                     PlayVideoFile(scriptText); // not an rsv
@@ -5348,7 +5348,7 @@ void ProcessScript(int scriptCodeStart, int jumpTableStart, byte scriptEvent)
                     scriptInfo->spriteSheetID = AddGraphicsFile(scriptText);
                 break;
             case FUNC_NEXTVIDEOFRAME:
-                opcodeSize = 0;
+                opcodeSize.           = 0;
                 UpdateVideoFrame();
                 break;
 #if !RETRO_REV02
