@@ -1,4 +1,5 @@
 #include "RetroEngine.hpp"
+#include "Video.hpp"
 #include <cmath>
 
 #if RETRO_USE_COMPILER
