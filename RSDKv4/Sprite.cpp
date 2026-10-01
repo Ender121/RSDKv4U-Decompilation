@@ -218,7 +218,6 @@ int AddGraphicsFile(const char *filePath)
         case 'f': LoadGIFFile(sheetPath, sheetID); break;
         case 'p': LoadBMPFile(sheetPath, sheetID); break;
         case 'r': LoadPVRFile(sheetPath, sheetID); break;
-        case 'v': LoadRSVFile(sheetPath, sheetID); break;
     }
 
     return sheetID;
@@ -434,49 +433,6 @@ int LoadPVRFile(const char *filePath, byte sheetID)
         buffer += 0x400 - width;
 
         CloseFile();
-        return true;
-    }
-    return false;
-}
-int LoadRSVFile(const char *filePath, byte sheetID)
-{
-    FileInfo info;
-    if (LoadFile(filePath, &info)) {
-        GFXSurface *surface = &gfxSurface[sheetID];
-        StrCopy(surface->fileName, filePath);
-
-        videoSurface      = sheetID;
-        currentVideoFrame = 0;
-
-        byte fileBuffer = 0;
-
-        FileRead(&fileBuffer, 1);
-        videoFrameCount = fileBuffer;
-        FileRead(&fileBuffer, 1);
-        videoFrameCount += fileBuffer << 8;
-
-        FileRead(&fileBuffer, 1);
-        videoWidth = fileBuffer;
-        FileRead(&fileBuffer, 1);
-        videoWidth += fileBuffer << 8;
-
-        FileRead(&fileBuffer, 1);
-        videoHeight = fileBuffer;
-        FileRead(&fileBuffer, 1);
-        videoHeight += fileBuffer << 8;
-
-        videoFilePos          = (int)GetFilePosition();
-        videoPlaying          = 2; // playing rsv
-        surface->width        = videoWidth;
-        surface->height       = videoHeight;
-        surface->dataPosition = gfxDataPosition;
-        gfxDataPosition += surface->width * surface->height;
-
-        if (gfxDataPosition >= GFXDATA_SIZE) {
-            gfxDataPosition = 0;
-            PrintLog("WARNING: Exceeded max gfx size!");
-        }
-
         return true;
     }
     return false;
