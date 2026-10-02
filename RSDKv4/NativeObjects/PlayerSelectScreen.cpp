@@ -78,25 +78,25 @@ void PlayerSelectScreen_Main(void *objPtr)
                 }
                 else {
                     if (keyPress.left) {
-                        if (saveGame->knuxUnlocked) {
+                        if (saveRAM[GET_IDX_SO(OFFSET_KNUXUNLOCKED)]) {
                             PlaySfxByName("Menu Move", false);
                             if (--self->playerID < SAVESEL_SONIC)
                                 self->playerID = SAVESEL_KNUX;
                         }
-                        else if (saveGame->tailsUnlocked) {
+                        else if (saveRAM[GET_IDX_SO(OFFSET_TAILSUNLOCKED)]) {
                             PlaySfxByName("Menu Move", false);
                             if (--self->playerID > SAVESEL_SONIC)
                                 self->playerID = SAVESEL_TAILS;
                         }
                     }
                     else if (keyPress.right) {
-                        if (saveGame->knuxUnlocked) {
+                        if (saveRAM[GET_IDX_SO(OFFSET_KNUXUNLOCKED)]) {
                             PlaySfxByName("Menu Move", false);
 
                             if (++self->playerID > SAVESEL_KNUX)
                                 self->playerID = SAVESEL_SONIC;
                         }
-                        else if (saveGame->tailsUnlocked) {
+                        else if (saveRAM[GET_IDX_SO(OFFSET_TAILSUNLOCKED)]) {
                             PlaySfxByName("Menu Move", false);
 
                             if (++self->playerID > SAVESEL_TAILS)
@@ -127,7 +127,7 @@ void PlayerSelectScreen_Main(void *objPtr)
                     else {
                         self->playerID = SAVESEL_SONIC;
                     }
-                    if (saveGame->tailsUnlocked) {
+                    if (saveRAM[GET_IDX_SO(OFFSET_TAILSUNLOCKED)]) {
                         if (CheckTouchRect(-84.0, -64.0, 16.0, 16.0) < 0) {
                             if (self->playerID == SAVESEL_ST)
                                 self->playerID = SAVESEL_SONIC;
@@ -143,7 +143,7 @@ void PlayerSelectScreen_Main(void *objPtr)
                             self->playerID = SAVESEL_TAILS;
                         }
                     }
-                    if (saveGame->knuxUnlocked) {
+                    if (saveRAM[GET_IDX_SO(OFFSET_KNUXUNLOCKED)]) {
                         if (CheckTouchRect(88.0, 24.0, 40.0, 40.0) < 0) {
                             if (self->playerID == SAVESEL_KNUX)
                                 self->playerID = SAVESEL_NONE;
@@ -200,18 +200,18 @@ void PlayerSelectScreen_Main(void *objPtr)
                     SetGlobalVariableByName("options.gameMode", 1);
 
                     switch (self->playerID) {
-                        case SAVESEL_SONIC: saveGame->files[saveSel->selectedButton - 1].characterID = 0; break;
-                        case SAVESEL_TAILS: saveGame->files[saveSel->selectedButton - 1].characterID = 1; break;
-                        case SAVESEL_KNUX: saveGame->files[saveSel->selectedButton - 1].characterID = 2; break;
-                        case SAVESEL_ST: saveGame->files[saveSel->selectedButton - 1].characterID = 3; break;
+                        case SAVESEL_SONIC: saveRAM[((saveSel->selectedButton - 1) * 8) + GET_IDX_SO(SAVEFILE_CHARACTER_ID)] = 0; break;
+                        case SAVESEL_TAILS: saveRAM[((saveSel->selectedButton - 1) * 8) + GET_IDX_SO(SAVEFILE_CHARACTER_ID)] = 1; break;
+                        case SAVESEL_KNUX: saveRAM[((saveSel->selectedButton - 1) * 8) + GET_IDX_SO(SAVEFILE_CHARACTER_ID)] = 2; break;
+                        case SAVESEL_ST: saveRAM[((saveSel->selectedButton - 1) * 8) + GET_IDX_SO(SAVEFILE_CHARACTER_ID)] = 3; break;
                     }
 
-                    saveGame->files[saveSel->selectedButton - 1].lives          = 3;
-                    saveGame->files[saveSel->selectedButton - 1].score          = 0;
-                    saveGame->files[saveSel->selectedButton - 1].scoreBonus     = 50000;
-                    saveGame->files[saveSel->selectedButton - 1].stageID        = 1;
-                    saveGame->files[saveSel->selectedButton - 1].emeralds       = 0;
-                    saveGame->files[saveSel->selectedButton - 1].specialStageID = 0;
+                    saveRAM[((saveSel->selectedButton - 1) * 8) + GET_IDX_SO(SAVEFILE_LIVES)]          = 3;
+                    saveRAM[((saveSel->selectedButton - 1) * 8) + GET_IDX_SO(SAVEFILE_SCORE)]          = 0;
+                    saveRAM[((saveSel->selectedButton - 1) * 8) + GET_IDX_SO(SAVEFILE_SCOREBONUS)]     = 50000;
+                    saveRAM[((saveSel->selectedButton - 1) * 8) + GET_IDX_SO(SAVEFILE_STAGEID)]        = 1;
+                    saveRAM[((saveSel->selectedButton - 1) * 8) + GET_IDX_SO(SAVEFILE_EMERALDS)]       = 0;
+                    saveRAM[((saveSel->selectedButton - 1) * 8) + GET_IDX_SO(SAVEFILE_SPECIALSTAGEID)] = 0;
                     WriteSaveRAMData();
                 }
                 SetGlobalVariableByName("options.stageSelectFlag", 0);
@@ -302,7 +302,7 @@ void PlayerSelectScreen_Main(void *objPtr)
         RenderImage(0.0, -12.0, 8.0, 0.3, 0.3, 128.0, 128.0, 256.0, 256.0, 256.0, 256.0, 0xFF, self->texturePlayerSel);
     }
 
-    if (saveGame->tailsUnlocked)
+    if (saveRAM[GET_IDX_SO(OFFSET_TAILSUNLOCKED)])
         SetRenderVertexColor(255, 255, 255);
     else
         SetRenderVertexColor(0, 0, 0);
@@ -321,13 +321,13 @@ void PlayerSelectScreen_Main(void *objPtr)
         RenderImage(88.0, 28.0, 8.0, 0.3, 0.3, 128.0, 128.0, 256.0, 256.0, 256.0, 256.0, 0xFF, self->texturePlayerSel);
     }
 
-    if (saveGame->knuxUnlocked)
+    if (saveRAM[GET_IDX_SO(OFFSET_KNUXUNLOCKED)])
         SetRenderVertexColor(0xFF, 0xFF, 0xFF);
     else
         SetRenderVertexColor(0, 0, 0);
     RenderImage(88.0, 32.0, 8.0, 0.3, 0.3, 128.0, 128.0, 256.0, 256.0, 0.0, 256.0, 0xFF, self->texturePlayerSel);
 
-    if (saveGame->tailsUnlocked) {
+    if (saveRAM[GET_IDX_SO(OFFSET_TAILSUNLOCKED)]) {
         if (self->playerID == SAVESEL_ST && self->flag) {
             SetRenderVertexColor(255, 64, 0);
             RenderImage(-88.0, -56.0, 8.0, 0.135, 0.135, 128.0, 128.0, 256.0, 256.0, 256.0, 256.0, 0xFF, self->texturePlayerSel);
@@ -355,7 +355,7 @@ void PlayerSelectScreen_Main(void *objPtr)
         SetRenderVertexColor(0xFF, 0xFF, 0xFF);
     RenderText(self->textSonic, FONT_TEXT, self->sonicX, -22.0, 8.0, 0.2, 255);
 
-    if (saveGame->tailsUnlocked) {
+    if (saveRAM[GET_IDX_SO(OFFSET_TAILSUNLOCKED)]) {
         if ((self->playerID == SAVESEL_TAILS || self->playerID == SAVESEL_ST) && self->flag)
             SetRenderVertexColor(0xFF, 0xFF, 0x40);
         else
@@ -365,7 +365,7 @@ void PlayerSelectScreen_Main(void *objPtr)
         SetRenderVertexColor(0xA0, 0xA0, 0xA0);
     }
     RenderText(self->textTails, FONT_TEXT, self->tailsX, -64.0, 8.0, 0.2, 0xFF);
-    if (saveGame->knuxUnlocked) {
+    if (saveRAM[GET_IDX_SO(OFFSET_KNUXUNLOCKED)]) {
         if (self->playerID == SAVESEL_KNUX && self->flag)
             SetRenderVertexColor(0xFF, 0xFF, 0x40);
         else
