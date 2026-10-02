@@ -401,6 +401,10 @@ void InitNativeObjectSystem()
         saveGame->tailsUnlocked   = Engine.gameType != GAME_SONIC1;
         saveGame->knuxUnlocked    = Engine.gameType != GAME_SONIC1;
         saveGame->unlockedActs    = 0;
+#if !RETRO_USE_ORIGINAL_CODE
+        if (Engine.gameType == GAME_SONICCD)
+            saveGame->soundtrackJP = true; // JP by default, same as options.soundtrack = 0
+#endif
         WriteSaveRAMData();
     }
 #if !RETRO_USE_ORIGINAL_CODE
@@ -411,6 +415,11 @@ void InitNativeObjectSystem()
         saveGame->knuxUnlocked  = true;
         WriteSaveRAMData();
     }
+#endif
+#if !RETRO_USE_ORIGINAL_CODE
+    // Sonic CD: apply the soundtrack saved by the settings button (1 = JP -> options.soundtrack 0)
+    if (Engine.gameType == GAME_SONICCD)
+        SetGlobalVariableByName("options.soundtrack", saveGame->soundtrackJP ? 0 : 1);
 #endif
     saveGame->musVolume = bgmVolume;
     saveGame->sfxVolume = sfxVolume;
