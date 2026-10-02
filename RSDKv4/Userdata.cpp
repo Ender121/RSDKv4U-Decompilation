@@ -42,9 +42,16 @@ int disableFocusPause_Config = 0;
 
 bool useSGame = false;
 
+// Sonic CD uses its own save file, exactly like RSDKv4-CD18: SGame_SoCD.bin (never SData.bin).
+// Every other game keeps the original SGame.bin / SData.bin behaviour.
+static inline const char *GetSGameFileName()
+{
+    return Engine.gameType == GAME_SONICCD ? "SGame_SoCD.bin" : "SGame.bin";
+}
+
 bool ReadSaveRAMData()
 {
-    useSGame = false;
+    useSGame = (Engine.gameType == GAME_SONICCD);
     char buffer[0x180];
 #if RETRO_USE_MOD_LOADER
 #if RETRO_PLATFORM == RETRO_UWP
@@ -74,33 +81,35 @@ bool ReadSaveRAMData()
 #endif
 #endif
 
-    FileIO *saveFile = fOpen(buffer, "rb");
+    FileIO *saveFile = nullptr;
+    if (Engine.gameType != GAME_SONICCD) // Sonic CD never reads SData.bin
+        saveFile = fOpen(buffer, "rb");
     if (!saveFile) {
 #if RETRO_USE_MOD_LOADER
 #if RETRO_PLATFORM == RETRO_UWP
         if (!usingCWD)
-            sprintf(buffer, "%s/%sSGame.bin", redirectSave ? modsPath : getResourcesPath(), savePath);
+            sprintf(buffer, "%s/%s%s", redirectSave ? modsPath : getResourcesPath(), savePath, GetSGameFileName());
         else
-            sprintf(buffer, "%s%sSGame.bin", redirectSave ? modsPath : gamePath, savePath);
+            sprintf(buffer, "%s%s%s", redirectSave ? modsPath : gamePath, savePath, GetSGameFileName());
 #elif RETRO_PLATFORM == RETRO_OSX
-        sprintf(buffer, "%s/%sSGame.bin", redirectSave ? modsPath : gamePath, savePath);
+        sprintf(buffer, "%s/%s%s", redirectSave ? modsPath : gamePath, savePath, GetSGameFileName());
 #elif RETRO_PLATFORM == RETRO_iOS
-        sprintf(buffer, "%s/%sSGame.bin", redirectSave ? modsPath : getDocumentsPath(), savePath);
+        sprintf(buffer, "%s/%s%s", redirectSave ? modsPath : getDocumentsPath(), savePath, GetSGameFileName());
 #else
-        sprintf(buffer, "%s%sSGame.bin", redirectSave ? modsPath : gamePath, savePath);
+        sprintf(buffer, "%s%s%s", redirectSave ? modsPath : gamePath, savePath, GetSGameFileName());
 #endif
 #else
 #if RETRO_PLATFORM == RETRO_UWP
         if (!usingCWD)
-            sprintf(buffer, "%s/%sSGame.bin", getResourcesPath(), savePath);
+            sprintf(buffer, "%s/%s%s", getResourcesPath(), savePath, GetSGameFileName());
         else
-            sprintf(buffer, "%s%sSGame.bin", gamePath, savePath);
+            sprintf(buffer, "%s%s%s", gamePath, savePath, GetSGameFileName());
 #elif RETRO_PLATFORM == RETRO_OSX
-        sprintf(buffer, "%s/%sSGame.bin", gamePath, savePath);
+        sprintf(buffer, "%s/%s%s", gamePath, savePath, GetSGameFileName());
 #elif RETRO_PLATFORM == RETRO_iOS
-        sprintf(buffer, "%s/%sSGame.bin", getDocumentsPath(), savePath);
+        sprintf(buffer, "%s/%s%s", getDocumentsPath(), savePath, GetSGameFileName());
 #else
-        sprintf(buffer, "%s%sSGame.bin", gamePath, savePath);
+        sprintf(buffer, "%s%s%s", gamePath, savePath, GetSGameFileName());
 #endif
 #endif
 
@@ -118,7 +127,7 @@ bool WriteSaveRAMData()
 {
     char buffer[0x180];
 
-    if (!useSGame) {
+    if (!useSGame && Engine.gameType != GAME_SONICCD) {
 #if RETRO_USE_MOD_LOADER
 #if RETRO_PLATFORM == RETRO_UWP
         if (!usingCWD)
@@ -151,28 +160,28 @@ bool WriteSaveRAMData()
 #if RETRO_USE_MOD_LOADER
 #if RETRO_PLATFORM == RETRO_UWP
         if (!usingCWD)
-            sprintf(buffer, "%s/%sSGame.bin", redirectSave ? modsPath : getResourcesPath(), savePath);
+            sprintf(buffer, "%s/%s%s", redirectSave ? modsPath : getResourcesPath(), savePath, GetSGameFileName());
         else
-            sprintf(buffer, "%s%sSGame.bin", redirectSave ? modsPath : gamePath, savePath);
+            sprintf(buffer, "%s%s%s", redirectSave ? modsPath : gamePath, savePath, GetSGameFileName());
 #elif RETRO_PLATFORM == RETRO_OSX
-        sprintf(buffer, "%s/%sSGame.bin", redirectSave ? modsPath : gamePath, savePath);
+        sprintf(buffer, "%s/%s%s", redirectSave ? modsPath : gamePath, savePath, GetSGameFileName());
 #elif RETRO_PLATFORM == RETRO_iOS
-        sprintf(buffer, "%s/%sSGame.bin", redirectSave ? modsPath : getDocumentsPath(), savePath);
+        sprintf(buffer, "%s/%s%s", redirectSave ? modsPath : getDocumentsPath(), savePath, GetSGameFileName());
 #else
-        sprintf(buffer, "%s%sSGame.bin", redirectSave ? modsPath : gamePath, savePath);
+        sprintf(buffer, "%s%s%s", redirectSave ? modsPath : gamePath, savePath, GetSGameFileName());
 #endif
 #else
 #if RETRO_PLATFORM == RETRO_UWP
         if (!usingCWD)
-            sprintf(buffer, "%s/%sSGame.bin", getResourcesPath(), savePath);
+            sprintf(buffer, "%s/%s%s", getResourcesPath(), savePath, GetSGameFileName());
         else
-            sprintf(buffer, "%s%sSGame.bin", gamePath, savePath);
+            sprintf(buffer, "%s%s%s", gamePath, savePath, GetSGameFileName());
 #elif RETRO_PLATFORM == RETRO_OSX
-        sprintf(buffer, "%s/%sSGame.bin", gamePath, savePath);
+        sprintf(buffer, "%s/%s%s", gamePath, savePath, GetSGameFileName());
 #elif RETRO_PLATFORM == RETRO_iOS
-        sprintf(buffer, "%s/%sSGame.bin", getDocumentsPath(), savePath);
+        sprintf(buffer, "%s/%s%s", getDocumentsPath(), savePath, GetSGameFileName());
 #else
-        sprintf(buffer, "%s%sSGame.bin", gamePath, savePath);
+        sprintf(buffer, "%s%s%s", gamePath, savePath, GetSGameFileName());
 #endif
 #endif
     }
@@ -183,6 +192,96 @@ bool WriteSaveRAMData()
     fWrite(saveRAM, sizeof(int), SAVEDATA_SIZE, saveFile);
     fClose(saveFile);
     return true;
+}
+
+// Returns the saveRAM offset of a SAVEFILE_* / OFFSET_* value for the current game.
+// Sonic CD stores its per-slot data in a different order than Sonic 1/2 (same as RSDKv4-CD18).
+int GET_IDX_SO(int offset)
+{
+    switch (offset) {
+        case 0: // characterID
+        case 1: // lives
+        case 2: // score
+            return offset;
+
+        case 3: // scoreBonus
+            offset = 3;
+            if (Engine.gameType == GAME_SONICCD) {
+                offset = 6; // would be specialStageID
+            }
+            return offset;
+
+        case 4: // stageID
+            offset = 4;
+            if (Engine.gameType == GAME_SONICCD) {
+                offset = 3; // would be scoreBonus
+            }
+            return offset;
+
+        case 5: // emeralds -> timeStones in CD
+            offset = 5;
+            if (Engine.gameType == GAME_SONICCD) {
+                offset = 4; // would be stageID
+            }
+            return offset;
+
+        case 6: // specialStageID
+            offset = 6;
+            if (Engine.gameType == GAME_SONICCD) {
+                offset = 5; // would be emeralds
+            }
+            return offset;
+
+        case 7: // unused
+            offset = 0x2d; // 45 -> regularly unlockedActs
+            if (Engine.gameType == GAME_SONICCD) {
+                offset = 0x27; // 39 -> for CD becomes vDPadX_Move
+            }
+            return offset;
+
+        case 0x13: // 19, used in files[4]
+            return 7;
+    }
+
+    if (offset - 8 < 7) {
+        offset += 0x1c; // offset + 28 (inside of files[4])
+        if (Engine.gameType == GAME_SONICCD) {
+            offset = 1000; // unused by the save file
+        }
+        return offset;
+    }
+
+    switch (offset - 0xf) { // offset - 15
+        case 0:
+            offset = 1000; // unused by the save file
+            if (Engine.gameType == GAME_SONICCD) {
+                offset = 0x26; // 38 -> for CD becomes vDPadOpacity
+            }
+            return offset;
+
+        case 1:
+            offset = 0x2b; // 43 -> usually tailsUnlocked
+            if (Engine.gameType == GAME_SONICCD) {
+                offset = 0x24; // 36 -> for CD becomes boxRegion
+            }
+            return offset;
+
+        case 2:
+            offset = 0x2c; // 44 -> usually knuxUnlocked
+            if (Engine.gameType == GAME_SONICCD) {
+                offset = 1000; // unused by the save file, Knuckles has no slot in CD
+            }
+            return offset;
+
+        case 3:
+            offset = 1000;
+            if (Engine.gameType == GAME_SONIC2) {
+                offset = 0x2e; // 46 -> for S2 becomes unlockedHPZ
+            }
+            return offset;
+
+        default: return offset - 0xf; // offset - 15
+    }
 }
 
 void InitUserdata()

@@ -19,6 +19,47 @@
 
 #define unused(x) (void)x
 
+// Save layout helpers shared with RSDKv4-CD18 (used when Engine.gameType == GAME_SONICCD)
+enum SAVEFILE_OFFSETS {
+    SAVEFILE_CHARACTER_ID,
+    SAVEFILE_LIVES,
+    SAVEFILE_SCORE,
+    SAVEFILE_SCOREBONUS,
+    SAVEFILE_STAGEID,
+    SAVEFILE_EMERALDS,
+    SAVEFILE_SPECIALSTAGEID,
+    SAVEFILE_UNUSED,
+};
+
+enum SAVERAM_OFFSETS {
+    SAVE_INIT          = 32,
+    SAVE_MUSVOL        = 33,
+    SAVE_SFXVOL        = 34,
+    SAVE_SPINDASH      = 35,
+    SAVE_BOXREGION     = 36,
+    SAVE_VDPADSIZE     = 37,
+    SAVE_VDPADOPACITY  = 38,
+    SAVE_VDPADX_MOVE   = 39,
+    SAVE_VDPADY_MOVE   = 40,
+    SAVE_VDPADX_JUMP   = 41,
+    SAVE_VDPADY_JUMP   = 42,
+    SAVE_TAILSUNLOCKED = 43,
+    SAVE_KNUXUNLOCKED  = 44,
+    SAVE_UNLOCKEDACTS  = 45,
+    SAVE_UNLOCKEDHPZ   = 46,
+
+    // taken from v6's InitNativeObjectSystem (same value as RSDKv4-CD18)
+    SAVE_INITIALOFFSET = 4000,
+};
+
+// Inputs for GET_IDX_SO that are not SAVEFILE_* values (used by PlayerSelectScreen in CD18)
+enum IDX_SO_INPUTS {
+    OFFSET_UNKNOWN_0     = 15,
+    OFFSET_TAILSUNLOCKED = 16,
+    OFFSET_KNUXUNLOCKED  = 17,
+    OFFSET_UNKNOWN_1     = 18,
+};
+
 struct SaveFile {
     int characterID;    // Value 0/8/16/24
     int lives;          // Value 1/9/17/25
@@ -28,6 +69,18 @@ struct SaveFile {
     int emeralds;       // Value 5/13/21/29
     int specialStageID; // Value 6/14/22/30
     int unused;         // Value 7/15/23/31
+    /*
+    Sonic CD mapping (see GET_IDX_SO)
+
+    0 characterID
+    1 lives
+    2 score
+    3 stageID -> scoreBonus in S1/S2
+    4 specialStageID -> stageID in S1/S2
+    5 timeStones -> emeralds in S1/S2
+    6 scoreBonus -> specialStageID in S1/S2
+    7 unused
+    */
 };
 
 struct SaveGame {
@@ -150,6 +203,9 @@ extern bool useSGame;
 bool ReadSaveRAMData();
 bool WriteSaveRAMData();
 
+
+// Save file offset function for handling the Sonic CD save layout (same as RSDKv4-CD18)
+int GET_IDX_SO(int offset);
 #if !RETRO_USE_ORIGINAL_CODE
 void InitUserdata();
 void WriteSettings();
