@@ -26,6 +26,7 @@ void VirtualDPad_Create(void *objPtr)
     self->vsMode              = GetGlobalVariableID("options.vsMode");
     self->textureID           = LoadTexture("Data/Game/Menu/VirtualDPad.png", TEXFMT_RGBA8888);
 }
+
 void VirtualDPad_Main(void *objPtr)
 {
     RSDK_THIS(VirtualDPad);
@@ -104,12 +105,19 @@ void VirtualDPad_Main(void *objPtr)
 
         if (Engine.gameMode == ENGINE_MAINGAME) {
             if (!globalVariables[self->vsMode]) {
-                if (activeStageList == STAGELIST_SPECIAL)
-                    RenderImage(self->pauseX_S, self->pauseY, 160.0, 0.25, 0.25, 32.0, 32.0, 64.0, 64.0, 160.0, 258.0, self->pauseAlpha,
-                                self->textureID);
-                else
-                    RenderImage(self->pauseX, self->pauseY, 160.0, 0.25, 0.25, 32.0, 32.0, 64.0, 64.0, 160.0, 258.0, self->pauseAlpha,
-                                self->textureID);
+                float pauseXPos = self->pauseX;
+                float pauseYPos = self->pauseY;
+
+                if (Engine.gameType == GAME_SONICCD && activeStageList == STAGELIST_SPECIAL) {
+                    // Posición en la esquina superior derecha exacta para fases especiales de Sonic CD
+                    pauseXPos = SCREEN_CENTERX - 16.0f;
+                    pauseYPos = SCREEN_CENTERY - 16.0f;
+                }
+                else if (activeStageList == STAGELIST_SPECIAL) {
+                    pauseXPos = self->pauseX_S;
+                }
+
+                RenderImage(pauseXPos, pauseYPos, 160.0, 0.25, 0.25, 32.0, 32.0, 64.0, 64.0, 160.0, 258.0, self->pauseAlpha, self->textureID);
             }
         }
     }

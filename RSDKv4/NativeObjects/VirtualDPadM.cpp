@@ -18,6 +18,7 @@ void VirtualDPadM_Create(void *objPtr)
     self->jumpSize  = self->moveSize * 0.75;
     self->textureID = LoadTexture("Data/Game/Menu/VirtualDPadM.png", 3);
 }
+
 void VirtualDPadM_Main(void *objPtr)
 {
     RSDK_THIS(VirtualDPadM);
@@ -78,10 +79,19 @@ void VirtualDPadM_Main(void *objPtr)
                     self->textureID);
 
         if (Engine.gameMode == ENGINE_MAINGAME) {
-            if (activeStageList == STAGELIST_SPECIAL)
-                RenderImage(self->pauseX_S, self->pauseY, 160.0, 0.25, 0.25, 32.0, 32.0, 64.0, 64.0, 160.0, 258.0, self->pauseAlpha, self->textureID);
-            else
-                RenderImage(self->pauseX, self->pauseY, 160.0, 0.25, 0.25, 32.0, 32.0, 64.0, 64.0, 160.0, 258.0, self->pauseAlpha, self->textureID);
+            float pauseXPos = self->pauseX;
+            float pauseYPos = self->pauseY;
+
+            if (Engine.gameType == GAME_SONICCD && activeStageList == STAGELIST_SPECIAL) {
+                // Posición en la esquina superior derecha exacta para fases especiales de Sonic CD
+                pauseXPos = SCREEN_CENTERX - 16.0f;
+                pauseYPos = SCREEN_CENTERY - 16.0f;
+            }
+            else if (activeStageList == STAGELIST_SPECIAL) {
+                pauseXPos = self->pauseX_S;
+            }
+
+            RenderImage(pauseXPos, pauseYPos, 160.0, 0.25, 0.25, 32.0, 32.0, 64.0, 64.0, 160.0, 258.0, self->pauseAlpha, self->textureID);
         }
     }
 }
