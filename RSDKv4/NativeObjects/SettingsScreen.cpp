@@ -288,8 +288,10 @@ void SettingsScreen_Main(void *objPtr)
                                     toggle                                                   = true;
                                 }
 #if !RETRO_USE_ORIGINAL_CODE
-                                if (isCD)
+                                if (isCD) {
                                     SetGlobalVariableByName("options.soundtrack", toggle ? 0 : 1);
+                                    WriteSaveRAMData();
+                                }
 #endif
                             }
                             break;
@@ -393,6 +395,7 @@ void SettingsScreen_Main(void *objPtr)
                         if (Engine.gameType == GAME_SONICCD) {
                             saveGame->soundtrackJP = true;
                             SetGlobalVariableByName("options.soundtrack", 0);
+                            WriteSaveRAMData();
                         }
                         else
 #endif
@@ -410,6 +413,7 @@ void SettingsScreen_Main(void *objPtr)
                         if (Engine.gameType == GAME_SONICCD) {
                             saveGame->soundtrackJP = false;
                             SetGlobalVariableByName("options.soundtrack", 1);
+                            WriteSaveRAMData();
                         }
                         else
 #endif

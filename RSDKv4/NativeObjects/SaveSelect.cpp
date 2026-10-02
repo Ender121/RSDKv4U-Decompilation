@@ -1,5 +1,22 @@
 #include "RetroEngine.hpp"
 
+
+// Sonic CD: stageID stored in a slot when the game has been beaten (set by R8/FadeScreen.txt).
+// Same idea as Sonic 2, where the last boss writes a stageID that maps to the "COMPLETE" string.
+// CD cannot reuse "stageID - 1 = string index" (it stores zone * 10 + variant), so it uses a value
+// that is neither a regular stage (1..70) nor a special stage (>= 0x51).
+#define SAVESELECT_CD_COMPLETE 0x50
+
+// SaveStageName30 in the StringList (SaveStageName22-29 are Special Stage 1-8);
+// falls back to the last loaded entry for shorter lists
+static ushort *GetCompleteString()
+{
+    int idx = 29;
+    if (idx >= stageStrCount)
+        idx = stageStrCount - 1;
+    return strSaveStageList[idx];
+}
+
 void SaveSelect_Create(void *objPtr)
 {
     RSDK_THIS(SaveSelect);
@@ -56,6 +73,13 @@ void SaveSelect_Create(void *objPtr)
         int stagePos = saveRAM[((i - 1) * 8) + GET_IDX_SO(SAVEFILE_STAGEID)];
         if (stagePos >= 0x80 && Engine.gameType != GAME_SONICCD) {
             SetStringToFont(self->saveButtons[i]->text, strSaveStageList[saveRAM[((i - 1) * 8) + GET_IDX_SO(SAVEFILE_SPECIALSTAGEID)] + 19], FONT_LABEL);
+            self->saveButtons[i]->state = SUBMENUBUTTON_STATE_SAVEBUTTON_SELECTED;
+            self->saveButtons[i]->textY = 2.0;
+            self->saveButtons[i]->scale = 0.08;
+            self->deleteEnabled         = true;
+        }
+        else if (stagePos == SAVESELECT_CD_COMPLETE && Engine.gameType == GAME_SONICCD) {
+            SetStringToFont(self->saveButtons[i]->text, GetCompleteString(), FONT_LABEL);
             self->saveButtons[i]->state = SUBMENUBUTTON_STATE_SAVEBUTTON_SELECTED;
             self->saveButtons[i]->textY = 2.0;
             self->saveButtons[i]->scale = 0.08;
@@ -392,6 +416,11 @@ void SaveSelect_Main(void *objPtr)
                                 specialStagePos += 1;
                             SetGlobalVariableByName("specialStage.nextZone", saveRAM[((saveSlot) * 8) + GET_IDX_SO(SAVEFILE_STAGEID)] - specialStagePos);
                             InitStartingStage(STAGELIST_SPECIAL, saveRAM[((saveSlot) * 8) + GET_IDX_SO(SAVEFILE_SPECIALSTAGEID)], saveRAM[((saveSlot) * 8) + GET_IDX_SO(SAVEFILE_CHARACTER_ID)]);
+                        }
+                        else if (Engine.gameType == GAME_SONICCD && saveRAM[((saveSlot) * 8) + GET_IDX_SO(SAVEFILE_STAGEID)] == SAVESELECT_CD_COMPLETE) {
+                            // Completed save: start again from the first stage of the regular list
+                            SetGlobalVariableByName("specialStage.nextZone", 0);
+                            InitStartingStage(STAGELIST_REGULAR, 0, saveRAM[((saveSlot) * 8) + GET_IDX_SO(SAVEFILE_CHARACTER_ID)]);
                         }
                         else {
                             SetGlobalVariableByName("specialStage.nextZone", saveRAM[((saveSlot) * 8) + GET_IDX_SO(SAVEFILE_STAGEID)] - 1);

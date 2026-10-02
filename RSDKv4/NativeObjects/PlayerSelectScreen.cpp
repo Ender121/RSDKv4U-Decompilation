@@ -1,5 +1,10 @@
 #include "RetroEngine.hpp"
 
+// Sonic CD: Tails and Knuckles are always selectable, whatever the save RAM says.
+// Other games keep reading the unlock flags from the save.
+#define PLAYERSELECT_TAILS_UNLOCKED (Engine.gameType == GAME_SONICCD || saveRAM[GET_IDX_SO(OFFSET_TAILSUNLOCKED)])
+#define PLAYERSELECT_KNUX_UNLOCKED  (Engine.gameType == GAME_SONICCD || saveRAM[GET_IDX_SO(OFFSET_KNUXUNLOCKED)])
+
 void PlayerSelectScreen_Create(void *objPtr)
 {
     RSDK_THIS(PlayerSelectScreen);
@@ -78,25 +83,25 @@ void PlayerSelectScreen_Main(void *objPtr)
                 }
                 else {
                     if (keyPress.left) {
-                        if (saveRAM[GET_IDX_SO(OFFSET_KNUXUNLOCKED)]) {
+                        if (PLAYERSELECT_KNUX_UNLOCKED) {
                             PlaySfxByName("Menu Move", false);
                             if (--self->playerID < SAVESEL_SONIC)
                                 self->playerID = SAVESEL_KNUX;
                         }
-                        else if (saveRAM[GET_IDX_SO(OFFSET_TAILSUNLOCKED)]) {
+                        else if (PLAYERSELECT_TAILS_UNLOCKED) {
                             PlaySfxByName("Menu Move", false);
                             if (--self->playerID > SAVESEL_SONIC)
                                 self->playerID = SAVESEL_TAILS;
                         }
                     }
                     else if (keyPress.right) {
-                        if (saveRAM[GET_IDX_SO(OFFSET_KNUXUNLOCKED)]) {
+                        if (PLAYERSELECT_KNUX_UNLOCKED) {
                             PlaySfxByName("Menu Move", false);
 
                             if (++self->playerID > SAVESEL_KNUX)
                                 self->playerID = SAVESEL_SONIC;
                         }
-                        else if (saveRAM[GET_IDX_SO(OFFSET_TAILSUNLOCKED)]) {
+                        else if (PLAYERSELECT_TAILS_UNLOCKED) {
                             PlaySfxByName("Menu Move", false);
 
                             if (++self->playerID > SAVESEL_TAILS)
@@ -127,7 +132,7 @@ void PlayerSelectScreen_Main(void *objPtr)
                     else {
                         self->playerID = SAVESEL_SONIC;
                     }
-                    if (saveRAM[GET_IDX_SO(OFFSET_TAILSUNLOCKED)]) {
+                    if (PLAYERSELECT_TAILS_UNLOCKED) {
                         if (CheckTouchRect(-84.0, -64.0, 16.0, 16.0) < 0) {
                             if (self->playerID == SAVESEL_ST)
                                 self->playerID = SAVESEL_SONIC;
@@ -143,7 +148,7 @@ void PlayerSelectScreen_Main(void *objPtr)
                             self->playerID = SAVESEL_TAILS;
                         }
                     }
-                    if (saveRAM[GET_IDX_SO(OFFSET_KNUXUNLOCKED)]) {
+                    if (PLAYERSELECT_KNUX_UNLOCKED) {
                         if (CheckTouchRect(88.0, 24.0, 40.0, 40.0) < 0) {
                             if (self->playerID == SAVESEL_KNUX)
                                 self->playerID = SAVESEL_NONE;
@@ -302,7 +307,7 @@ void PlayerSelectScreen_Main(void *objPtr)
         RenderImage(0.0, -12.0, 8.0, 0.3, 0.3, 128.0, 128.0, 256.0, 256.0, 256.0, 256.0, 0xFF, self->texturePlayerSel);
     }
 
-    if (saveRAM[GET_IDX_SO(OFFSET_TAILSUNLOCKED)])
+    if (PLAYERSELECT_TAILS_UNLOCKED)
         SetRenderVertexColor(255, 255, 255);
     else
         SetRenderVertexColor(0, 0, 0);
@@ -321,13 +326,13 @@ void PlayerSelectScreen_Main(void *objPtr)
         RenderImage(88.0, 28.0, 8.0, 0.3, 0.3, 128.0, 128.0, 256.0, 256.0, 256.0, 256.0, 0xFF, self->texturePlayerSel);
     }
 
-    if (saveRAM[GET_IDX_SO(OFFSET_KNUXUNLOCKED)])
+    if (PLAYERSELECT_KNUX_UNLOCKED)
         SetRenderVertexColor(0xFF, 0xFF, 0xFF);
     else
         SetRenderVertexColor(0, 0, 0);
     RenderImage(88.0, 32.0, 8.0, 0.3, 0.3, 128.0, 128.0, 256.0, 256.0, 0.0, 256.0, 0xFF, self->texturePlayerSel);
 
-    if (saveRAM[GET_IDX_SO(OFFSET_TAILSUNLOCKED)]) {
+    if (PLAYERSELECT_TAILS_UNLOCKED) {
         if (self->playerID == SAVESEL_ST && self->flag) {
             SetRenderVertexColor(255, 64, 0);
             RenderImage(-88.0, -56.0, 8.0, 0.135, 0.135, 128.0, 128.0, 256.0, 256.0, 256.0, 256.0, 0xFF, self->texturePlayerSel);
@@ -355,7 +360,7 @@ void PlayerSelectScreen_Main(void *objPtr)
         SetRenderVertexColor(0xFF, 0xFF, 0xFF);
     RenderText(self->textSonic, FONT_TEXT, self->sonicX, -22.0, 8.0, 0.2, 255);
 
-    if (saveRAM[GET_IDX_SO(OFFSET_TAILSUNLOCKED)]) {
+    if (PLAYERSELECT_TAILS_UNLOCKED) {
         if ((self->playerID == SAVESEL_TAILS || self->playerID == SAVESEL_ST) && self->flag)
             SetRenderVertexColor(0xFF, 0xFF, 0x40);
         else
@@ -365,7 +370,7 @@ void PlayerSelectScreen_Main(void *objPtr)
         SetRenderVertexColor(0xA0, 0xA0, 0xA0);
     }
     RenderText(self->textTails, FONT_TEXT, self->tailsX, -64.0, 8.0, 0.2, 0xFF);
-    if (saveRAM[GET_IDX_SO(OFFSET_KNUXUNLOCKED)]) {
+    if (PLAYERSELECT_KNUX_UNLOCKED) {
         if (self->playerID == SAVESEL_KNUX && self->flag)
             SetRenderVertexColor(0xFF, 0xFF, 0x40);
         else
