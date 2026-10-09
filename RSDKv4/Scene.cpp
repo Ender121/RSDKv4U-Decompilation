@@ -272,7 +272,13 @@ void ProcessStage(void)
                         case CAMERASTYLE_FOLLOW: SetPlayerScreenPosition(&objectEntityList[cameraTarget]); break;
                         case CAMERASTYLE_EXTENDED:
                         case CAMERASTYLE_EXTENDED_OFFSET_L:
-                        case CAMERASTYLE_EXTENDED_OFFSET_R: SetPlayerScreenPositionCDStyle(&objectEntityList[cameraTarget]); break;
+                        case CAMERASTYLE_EXTENDED_OFFSET_R:
+                            // Gameplay screen: with Extended Camera off the CD camera styles use the standard follow camera
+                            if (((SaveGame *)saveRAM)->extendedCamOff)
+                                SetPlayerScreenPosition(&objectEntityList[cameraTarget]);
+                            else
+                                SetPlayerScreenPositionCDStyle(&objectEntityList[cameraTarget]);
+                            break;
                         case CAMERASTYLE_HLOCKED: SetPlayerHLockedScreenPosition(&objectEntityList[cameraTarget]); break;
                         default: break;
                     }
@@ -350,7 +356,13 @@ void ProcessStage(void)
                         case CAMERASTYLE_FOLLOW: SetPlayerScreenPosition(&objectEntityList[cameraTarget]); break;
                         case CAMERASTYLE_EXTENDED:
                         case CAMERASTYLE_EXTENDED_OFFSET_L:
-                        case CAMERASTYLE_EXTENDED_OFFSET_R: SetPlayerScreenPositionCDStyle(&objectEntityList[cameraTarget]); break;
+                        case CAMERASTYLE_EXTENDED_OFFSET_R:
+                            // Gameplay screen: with Extended Camera off the CD camera styles use the standard follow camera
+                            if (((SaveGame *)saveRAM)->extendedCamOff)
+                                SetPlayerScreenPosition(&objectEntityList[cameraTarget]);
+                            else
+                                SetPlayerScreenPositionCDStyle(&objectEntityList[cameraTarget]);
+                            break;
                         case CAMERASTYLE_HLOCKED: SetPlayerHLockedScreenPosition(&objectEntityList[cameraTarget]); break;
                         default: break;
                     }
@@ -402,7 +414,13 @@ void ProcessStage(void)
                         case CAMERASTYLE_FOLLOW: SetPlayerScreenPosition(&objectEntityList[cameraTarget]); break;
                         case CAMERASTYLE_EXTENDED:
                         case CAMERASTYLE_EXTENDED_OFFSET_L:
-                        case CAMERASTYLE_EXTENDED_OFFSET_R: SetPlayerScreenPositionCDStyle(&objectEntityList[cameraTarget]); break;
+                        case CAMERASTYLE_EXTENDED_OFFSET_R:
+                            // Gameplay screen: with Extended Camera off the CD camera styles use the standard follow camera
+                            if (((SaveGame *)saveRAM)->extendedCamOff)
+                                SetPlayerScreenPosition(&objectEntityList[cameraTarget]);
+                            else
+                                SetPlayerScreenPositionCDStyle(&objectEntityList[cameraTarget]);
+                            break;
                         case CAMERASTYLE_HLOCKED: SetPlayerHLockedScreenPosition(&objectEntityList[cameraTarget]); break;
                         default: break;
                     }

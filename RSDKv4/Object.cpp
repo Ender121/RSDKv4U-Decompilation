@@ -420,6 +420,17 @@ void InitNativeObjectSystem()
     // Sonic CD: apply the soundtrack saved by the settings button (1 = JP -> options.soundtrack 0)
     if (Engine.gameType == GAME_SONICCD)
         SetGlobalVariableByName("options.soundtrack", saveGame->soundtrackJP ? 0 : 1);
+
+    // Sonic CD: Gameplay screen options. First run: keep the style the game already had, then apply the saved one
+    if (Engine.gameType == GAME_SONICCD) {
+        if (!saveGame->gameplayInit) {
+            saveGame->gameplayCD   = GetGlobalVariableByName("options.originalControls") ? 1 : 0;
+            saveGame->gameplayInit = 1;
+            WriteSaveRAMData();
+        }
+        SetGlobalVariableByName("options.originalControls", saveGame->gameplayCD ? 1 : 0);
+        SetGlobalVariableByName("options.airSpeedCap", saveGame->gameplayCD ? 1 : 0);
+    }
 #endif
     saveGame->musVolume = bgmVolume;
     saveGame->sfxVolume = sfxVolume;
