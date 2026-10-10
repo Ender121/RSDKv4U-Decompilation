@@ -26,6 +26,8 @@ static void SettingsScreen_UpdateGameplayButtons(NativeEntity_SettingsScreen *se
     }
 }
 
+static bool gameplayRestartNote = false; // shown after changing Spin Dash / Peel Out
+
 static void SettingsScreen_SetGameplay(NativeEntity_SettingsScreen *self, int row, int col)
 {
     SaveGame *saveGame = (SaveGame *)saveRAM;
@@ -35,8 +37,16 @@ static void SettingsScreen_SetGameplay(NativeEntity_SettingsScreen *self, int ro
             SetGlobalVariableByName("options.originalControls", saveGame->gameplayCD ? 1 : 0);
             SetGlobalVariableByName("options.airSpeedCap", saveGame->gameplayCD ? 1 : 0);
             break;
-        case 1: saveGame->spindashS2 = (col == 1); break;
-        case 2: saveGame->peelOutS2 = (col == 1); break;
+        case 1:
+            if (saveGame->spindashS2 != (col == 1))
+                gameplayRestartNote = true;
+            saveGame->spindashS2 = (col == 1);
+            break;
+        case 2:
+            if (saveGame->peelOutS2 != (col == 1))
+                gameplayRestartNote = true;
+            saveGame->peelOutS2 = (col == 1);
+            break;
         default: saveGame->extendedCamOff = (col == 1); break;
     }
     SettingsScreen_UpdateGameplayButtons(self);
@@ -46,6 +56,8 @@ static void SettingsScreen_SetGameplay(NativeEntity_SettingsScreen *self, int ro
 // shows the Gameplay panel buttons or the main page buttons (the unused ones stay invisible)
 static void SettingsScreen_ShowGameplay(NativeEntity_SettingsScreen *self, bool show)
 {
+    if (show)
+        gameplayRestartNote = false;
     for (int i = 0; i <= SETTINGSSCREEN_BTN_GAMEPLAY; ++i) self->buttons[i]->alpha = show ? 0 : 255;
     if (!show && Engine.gameType != GAME_SONIC1 && Engine.gameType != GAME_SONICCD) {
         self->buttons[SETTINGSSCREEN_BTN_SDON]->alpha  = 0;
@@ -1259,6 +1271,21 @@ void SettingsScreen_Main(void *objPtr)
                 else
                     SetRenderVertexColor(0xFF, 0xFF, 0xFF);
                 RenderText(self->gameplayRowText[r], FONT_LABEL, -128.0, 58.0 - (r - 1) * 32.0, 0, gameplayLabelScale, 255);
+            }
+            if (gameplayRestartNote) {
+                static ushort restartText[96];
+                static bool restartTextInit = false;
+                if (!restartTextInit) {
+                    SetStringToFont8(restartText, "The changes will not take effect until you restart the game", FONT_LABEL);
+                    restartTextInit = true;
+                }
+                float noteScale = 0.09f;
+                float noteW     = GetTextWidth(restartText, FONT_LABEL, noteScale);
+                if (noteW > 250.0f && noteW > 0.0f)
+                    noteScale *= 250.0f / noteW;
+                noteW = GetTextWidth(restartText, FONT_LABEL, noteScale);
+                SetRenderVertexColor(0xFF, 0x90, 0x00); // orange
+                RenderText(restartText, FONT_LABEL, -noteW / 2.0f, -66.0, 0, noteScale, 255);
             }
             SetRenderVertexColor(0xFF, 0xFF, 0xFF);
             break;
