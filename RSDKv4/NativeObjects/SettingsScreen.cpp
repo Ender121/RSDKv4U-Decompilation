@@ -76,6 +76,8 @@ static void SettingsScreen_PlaceGameplayButton(NativeEntity_SettingsScreen *self
 }
 
 // lines up the Gameplay rows (Spin Dash, Super Peel Out, Extended Camera) with the real button widths
+static float gameplayLabelScale = 0.125f;
+
 static void SettingsScreen_PlaceGameplayRows(NativeEntity_SettingsScreen *self)
 {
     float maxHalf = 0.0f;
@@ -91,6 +93,19 @@ static void SettingsScreen_PlaceGameplayRows(NativeEntity_SettingsScreen *self)
     }
     float x2 = 140.0f - maxHalf;
     float x1 = x2 - 2.0f * maxHalf - 8.0f;
+
+    // buttons stay where they are; if the longest label would run under them, shrink the labels a bit
+    float labelScale = Engine.language == RETRO_JP ? 0.09f : 0.125f;
+    float labelMax   = 0.0f;
+    for (int r = 1; r < 4; ++r) {
+        float w = GetTextWidth(self->gameplayRowText[r], FONT_LABEL, labelScale);
+        if (w > labelMax)
+            labelMax = w;
+    }
+    float avail = (x1 - maxHalf) - 8.0f - (-128.0f); // space between label origin and first button column
+    if (labelMax > avail && labelMax > 0.0f && avail > 0.0f)
+        labelScale *= avail / labelMax;
+    gameplayLabelScale = labelScale;
     for (int r = 0; r < 4; ++r) {
         for (int c = 0; c < 2; ++c) {
             NativeEntity_PushButton *b = self->buttons[SETTINGSSCREEN_BTN_GP_STYLE_CD + r * 2 + c];
@@ -1243,7 +1258,7 @@ void SettingsScreen_Main(void *objPtr)
                     SetRenderVertexColor(0xFF, 0xFF, 0x00);
                 else
                     SetRenderVertexColor(0xFF, 0xFF, 0xFF);
-                RenderText(self->gameplayRowText[r], FONT_LABEL, -128.0, 58.0 - (r - 1) * 32.0, 0, Engine.language == RETRO_JP ? 0.09 : 0.125, 255);
+                RenderText(self->gameplayRowText[r], FONT_LABEL, -128.0, 58.0 - (r - 1) * 32.0, 0, gameplayLabelScale, 255);
             }
             SetRenderVertexColor(0xFF, 0xFF, 0xFF);
             break;
