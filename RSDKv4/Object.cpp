@@ -428,6 +428,13 @@ void InitNativeObjectSystem()
             saveGame->gameplayInit = 1;
             WriteSaveRAMData();
         }
+        if (!saveGame->gameplayV2) {
+            // Spin Dash and Super Peel Out start with the same style as the game (CD or S2)
+            saveGame->spindashS2 = saveGame->gameplayCD ? 0 : 1;
+            saveGame->peelOutS2  = saveGame->gameplayCD ? 0 : 1;
+            saveGame->gameplayV2 = 1;
+            WriteSaveRAMData();
+        }
         SetGlobalVariableByName("options.originalControls", saveGame->gameplayCD ? 1 : 0);
         SetGlobalVariableByName("options.airSpeedCap", saveGame->gameplayCD ? 1 : 0);
     }

@@ -102,11 +102,12 @@ struct SaveGame {
     int unlockedHPZ;     // Value 46
     int soundtrackJP;    // Value 47 (Sonic CD: 1 = JP, 0 = US)
     int gameplayInit;    // Value 48 (Gameplay screen: options were seeded)
-    int gameplayCD;      // Value 49 (1 = CD style, 0 = S2 style)
-    int spindashOff;     // Value 50 (1 = Spin Dash disabled)
-    int peelOutOff;      // Value 51 (1 = Super Peel Out disabled)
+    int gameplayCD;      // Value 49 (Gameplay screen STYLE: 1 = CD, 0 = S2)
+    int spindashS2;      // Value 50 (Spin Dash style: 1 = S2, 0 = CD)
+    int peelOutS2;       // Value 51 (Super Peel Out style: 1 = S2, 0 = CD)
     int extendedCamOff;  // Value 52 (1 = Extended Camera disabled)
-    int unused[11];      // Values 53-63
+    int gameplayV2;      // Value 53 (Spin Dash / Super Peel Out switched from ON/OFF to CD/S2)
+    int unused[10];      // Values 54-63
     int records[0x80];   // Values 64-192
     int padding[0x73F];  // Values 193-2047
     int customSS[0x400]; // Values 2048-3072
