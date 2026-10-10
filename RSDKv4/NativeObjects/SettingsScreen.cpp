@@ -1272,11 +1272,11 @@ void SettingsScreen_Main(void *objPtr)
                     SetRenderVertexColor(0xFF, 0xFF, 0xFF);
                 RenderText(self->gameplayRowText[r], FONT_LABEL, -128.0, 58.0 - (r - 1) * 32.0, 0, gameplayLabelScale, 255);
             }
-            if (gameplayRestartNote) {
+            if (gameplayRestartNote && self->isPauseMenu) { // only in the pause menu options
                 static ushort restartText[96];
                 static bool restartTextInit = false;
                 if (!restartTextInit) {
-                    SetStringToFont8(restartText, "The changes will not take effect until you restart the game", FONT_LABEL);
+                    SetStringToFont8(restartText, "THE CHANGES WILL NOT TAKE EFFECT UNTIL YOU RESTART THE GAME", FONT_LABEL);
                     restartTextInit = true;
                 }
                 float noteScale = 0.09f;
