@@ -26,11 +26,10 @@ static void SettingsScreen_UpdateGameplayButtons(NativeEntity_SettingsScreen *se
     }
 }
 
-static bool gameplayRestartNote = false; // shown after changing Spin Dash / Peel Out
-
 static void SettingsScreen_SetGameplay(NativeEntity_SettingsScreen *self, int row, int col)
 {
     SaveGame *saveGame = (SaveGame *)saveRAM;
+    bool changed       = false;
     switch (row) {
         case 0:
             saveGame->gameplayCD = (col == 0);
@@ -38,26 +37,26 @@ static void SettingsScreen_SetGameplay(NativeEntity_SettingsScreen *self, int ro
             SetGlobalVariableByName("options.airSpeedCap", saveGame->gameplayCD ? 1 : 0);
             break;
         case 1:
-            if (saveGame->spindashS2 != (col == 1))
-                gameplayRestartNote = true;
+            changed              = saveGame->spindashS2 != (col == 1);
             saveGame->spindashS2 = (col == 1);
             break;
         case 2:
-            if (saveGame->peelOutS2 != (col == 1))
-                gameplayRestartNote = true;
+            changed              = saveGame->peelOutS2 != (col == 1);
             saveGame->peelOutS2 = (col == 1);
             break;
         default: saveGame->extendedCamOff = (col == 1); break;
     }
     SettingsScreen_UpdateGameplayButtons(self);
     WriteSaveRAMData();
+
+    // Spin Dash / Peel Out: restart notice (pause menu options only); the text starts tiny and grows
+    if (changed && self->isPauseMenu && self->gpNoteK == 0.0f)
+        self->gpNoteK = 0.05f;
 }
 
 // shows the Gameplay panel buttons or the main page buttons (the unused ones stay invisible)
 static void SettingsScreen_ShowGameplay(NativeEntity_SettingsScreen *self, bool show)
 {
-    if (show)
-        gameplayRestartNote = false;
     for (int i = 0; i <= SETTINGSSCREEN_BTN_GAMEPLAY; ++i) self->buttons[i]->alpha = show ? 0 : 255;
     if (!show && Engine.gameType != GAME_SONIC1 && Engine.gameType != GAME_SONICCD) {
         self->buttons[SETTINGSSCREEN_BTN_SDON]->alpha  = 0;
@@ -131,6 +130,7 @@ void SettingsScreen_Create(void *objPtr)
 {
     RSDK_THIS(SettingsScreen);
 
+    self->gpNoteK = 0.0f;
     NativeEntity_PushButton *button;
     SaveGame *saveGame = (SaveGame *)saveRAM;
 
@@ -999,6 +999,8 @@ void SettingsScreen_Main(void *objPtr)
             break;
         case SETTINGSSCREEN_STATE_GAMEPLAY: {
             SettingsScreen_PlaceGameplayRows(self);
+            if (self->gpNoteK > 0.0f && self->gpNoteK < 1.0f)
+                self->gpNoteK = fminf(self->gpNoteK + ((1.05f - self->gpNoteK) / ((60.0f * (float)Engine.deltaTime) * 8.0f)), 1.0f);
             CheckKeyDown(&keyDown);
             CheckKeyPress(&keyPress);
             SetRenderMatrix(&self->tempMatrix);
@@ -1022,6 +1024,7 @@ void SettingsScreen_Main(void *objPtr)
                     if (keyPress.B) {
                         PlaySfxByName("Menu Back", false);
                         self->backPressed = false;
+                        self->gpNoteK     = 0.0f;
                         self->state       = SETTINGSSCREEN_STATE_FLIP_GAMEPLAY;
                     }
                 }
@@ -1042,6 +1045,7 @@ void SettingsScreen_Main(void *objPtr)
                     if (self->backPressed || keyPress.B) {
                         PlaySfxByName("Menu Back", false);
                         self->backPressed = false;
+                        self->gpNoteK     = 0.0f;
                         self->state       = SETTINGSSCREEN_STATE_FLIP_GAMEPLAY;
                     }
                     else if (keyDown.up || keyDown.down) {
@@ -1272,22 +1276,19 @@ void SettingsScreen_Main(void *objPtr)
                     SetRenderVertexColor(0xFF, 0xFF, 0xFF);
                 RenderText(self->gameplayRowText[r], FONT_LABEL, -128.0, 58.0 - (r - 1) * 32.0, 0, gameplayLabelScale, 255);
             }
-            if (gameplayRestartNote && self->isPauseMenu) { // only in the pause menu options
-                static ushort restartText[96];
-                static bool restartTextInit = false;
-                if (!restartTextInit) {
-                    SetStringToFont8(restartText, "THE CHANGES WILL NOT TAKE EFFECT UNTIL YOU RESTART THE GAME", FONT_LABEL);
-                    restartTextInit = true;
-                }
-                float noteScale = 0.09f;
-                float noteW     = GetTextWidth(restartText, FONT_LABEL, noteScale);
-                if (noteW > 250.0f && noteW > 0.0f)
-                    noteScale *= 250.0f / noteW;
-                noteW = GetTextWidth(restartText, FONT_LABEL, noteScale);
-                SetRenderVertexColor(0xFF, 0x90, 0x00); // orange
-                RenderText(restartText, FONT_LABEL, -noteW / 2.0f, -66.0, 0, noteScale, 255);
-            }
             SetRenderVertexColor(0xFF, 0xFF, 0xFF);
+            if (self->gpNoteK > 0.0f) {
+                const char *noteSrc = "The changes will not take effect until you restart the game";
+                ushort note[128];
+                SetStringToFont8(note, noteSrc, FONT_TEXT);
+                float full = 240.0f / (GetTextWidth(note, FONT_TEXT, 1.0f) + 1.0f);
+                if (full > 0.4f)
+                    full = 0.4f;
+                float ns = full * self->gpNoteK;
+                SetRenderVertexColor(0xFF, 0x80, 0x00);
+                RenderText(note, FONT_TEXT, GetTextWidth(note, FONT_TEXT, ns) * -0.5f, -66.0f - GetTextHeight(note, FONT_TEXT, ns) * 0.5f, 0, ns, 255);
+                SetRenderVertexColor(0xFF, 0xFF, 0xFF);
+            }
             break;
         case SETTINGSSCREEN_STATEDRAW_MAIN:
             if (self->selected == SETTINGSSCREEN_SEL_MUSVOL)

@@ -90,6 +90,7 @@ struct NativeEntity_SettingsScreen : NativeEntityBase {
     ushort boxArtText[24];
     ushort gameplayRowText[4][32];
     int gpSelected;
+    float gpNoteK;
     NativeEntity_PushButton *buttons[SETTINGSSCREEN_BTN_COUNT];
     int selected;
     NativeEntity_VirtualDPad *virtualDPad;
