@@ -274,7 +274,7 @@ void ProcessStage(void)
                         case CAMERASTYLE_EXTENDED_OFFSET_L:
                         case CAMERASTYLE_EXTENDED_OFFSET_R:
                             // Gameplay screen: with Extended Camera off the CD camera styles use the standard follow camera
-                            if (((SaveGame *)saveRAM)->extendedCamOff)
+                            if (Engine.gameType == GAME_SONICCD && ((SaveGame *)saveRAM)->extendedCamOff)
                                 SetPlayerScreenPosition(&objectEntityList[cameraTarget]);
                             else
                                 SetPlayerScreenPositionCDStyle(&objectEntityList[cameraTarget]);
@@ -358,7 +358,7 @@ void ProcessStage(void)
                         case CAMERASTYLE_EXTENDED_OFFSET_L:
                         case CAMERASTYLE_EXTENDED_OFFSET_R:
                             // Gameplay screen: with Extended Camera off the CD camera styles use the standard follow camera
-                            if (((SaveGame *)saveRAM)->extendedCamOff)
+                            if (Engine.gameType == GAME_SONICCD && ((SaveGame *)saveRAM)->extendedCamOff)
                                 SetPlayerScreenPosition(&objectEntityList[cameraTarget]);
                             else
                                 SetPlayerScreenPositionCDStyle(&objectEntityList[cameraTarget]);
@@ -416,7 +416,7 @@ void ProcessStage(void)
                         case CAMERASTYLE_EXTENDED_OFFSET_L:
                         case CAMERASTYLE_EXTENDED_OFFSET_R:
                             // Gameplay screen: with Extended Camera off the CD camera styles use the standard follow camera
-                            if (((SaveGame *)saveRAM)->extendedCamOff)
+                            if (Engine.gameType == GAME_SONICCD && ((SaveGame *)saveRAM)->extendedCamOff)
                                 SetPlayerScreenPosition(&objectEntityList[cameraTarget]);
                             else
                                 SetPlayerScreenPositionCDStyle(&objectEntityList[cameraTarget]);
