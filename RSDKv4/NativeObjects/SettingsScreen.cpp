@@ -2,15 +2,15 @@
 
 // ---------------------------------------------------------------------------------------------
 // Gameplay panel helpers (CD / S2 style, Spin Dash, Super Peel Out and Extended Camera)
-// Each row has two buttons: column 0 = CD / ON, column 1 = S2 / OFF
+// Each row has two buttons: column 0 = CD (ON for Extended Camera), column 1 = S2 (OFF for Extended Camera)
 // ---------------------------------------------------------------------------------------------
 static int SettingsScreen_GameplayActive(int row)
 {
     SaveGame *saveGame = (SaveGame *)saveRAM;
     switch (row) {
         case 0: return saveGame->gameplayCD ? 0 : 1;
-        case 1: return saveGame->spindashOff ? 1 : 0;
-        case 2: return saveGame->peelOutOff ? 1 : 0;
+        case 1: return saveGame->spindashS2 ? 1 : 0;
+        case 2: return saveGame->peelOutS2 ? 1 : 0;
         default: return saveGame->extendedCamOff ? 1 : 0;
     }
 }
@@ -35,8 +35,8 @@ static void SettingsScreen_SetGameplay(NativeEntity_SettingsScreen *self, int ro
             SetGlobalVariableByName("options.originalControls", saveGame->gameplayCD ? 1 : 0);
             SetGlobalVariableByName("options.airSpeedCap", saveGame->gameplayCD ? 1 : 0);
             break;
-        case 1: saveGame->spindashOff = (col == 1); break;
-        case 2: saveGame->peelOutOff = (col == 1); break;
+        case 1: saveGame->spindashS2 = (col == 1); break;
+        case 2: saveGame->peelOutS2 = (col == 1); break;
         default: saveGame->extendedCamOff = (col == 1); break;
     }
     SettingsScreen_UpdateGameplayButtons(self);
@@ -54,6 +54,8 @@ static void SettingsScreen_ShowGameplay(NativeEntity_SettingsScreen *self, bool 
     if (Engine.gameType != GAME_SONICCD)
         self->buttons[SETTINGSSCREEN_BTN_GAMEPLAY]->alpha = 0;
     for (int i = SETTINGSSCREEN_BTN_GP_STYLE_CD; i < SETTINGSSCREEN_BTN_COUNT; ++i) self->buttons[i]->alpha = show ? 255 : 0;
+    self->buttons[SETTINGSSCREEN_BTN_GP_STYLE_CD]->alpha     = 0;
+    self->buttons[SETTINGSSCREEN_BTN_GP_STYLE_S2]->alpha     = 0;
 }
 
 // puts the Gameplay button right next to the Controls button using the real button widths
@@ -70,6 +72,31 @@ static void SettingsScreen_PlaceGameplayButton(NativeEntity_SettingsScreen *self
     if (over > 0.0f) {
         c->x -= over;
         g->x -= over;
+    }
+}
+
+// lines up the Gameplay rows (Spin Dash, Super Peel Out, Extended Camera) with the real button widths
+static void SettingsScreen_PlaceGameplayRows(NativeEntity_SettingsScreen *self)
+{
+    float maxHalf = 0.0f;
+    for (int r = 1; r < 4; ++r) {
+        for (int c = 0; c < 2; ++c) {
+            NativeEntity_PushButton *b = self->buttons[SETTINGSSCREEN_BTN_GP_STYLE_CD + r * 2 + c];
+            if (b->textWidth <= 0.0f)
+                return;
+            float half = b->textWidth + b->scale * 64.0f;
+            if (half > maxHalf)
+                maxHalf = half;
+        }
+    }
+    float x2 = 140.0f - maxHalf;
+    float x1 = x2 - 2.0f * maxHalf - 8.0f;
+    for (int r = 0; r < 4; ++r) {
+        for (int c = 0; c < 2; ++c) {
+            NativeEntity_PushButton *b = self->buttons[SETTINGSSCREEN_BTN_GP_STYLE_CD + r * 2 + c];
+            b->x                       = c ? x2 : x1;
+            b->y                       = r == 0 ? 1000.0f : 62.0f - (r - 1) * 32.0f; // row 0 (STYLE) is removed
+        }
     }
 }
 
@@ -229,7 +256,7 @@ void SettingsScreen_Create(void *objPtr)
     SetStringToFont8(self->gameplayRowText[1], "SPIN DASH", FONT_LABEL);
     SetStringToFont8(self->gameplayRowText[2], "SUPER PEEL OUT", FONT_LABEL);
     SetStringToFont8(self->gameplayRowText[3], "EXTENDED CAMERA", FONT_LABEL);
-    const char *gpNames[8] = { "CD", "S2", "ON", "OFF", "ON", "OFF", "ON", "OFF" };
+    const char *gpNames[8] = { "CD", "S2", "CD", "S2", "CD", "S2", "ON", "OFF" };
     for (int r = 0; r < 4; ++r) {
         for (int c = 0; c < 2; ++c) {
             int idx                 = SETTINGSSCREEN_BTN_GP_STYLE_CD + r * 2 + c;
@@ -237,7 +264,7 @@ void SettingsScreen_Create(void *objPtr)
             self->buttons[idx]      = button;
             button->useRenderMatrix = true;
             button->x               = 56.0f + c * 52.0f;
-            button->y               = 62.0f - r * 32.0f;
+            button->y               = r == 0 ? 1000.0f : 62.0f - (r - 1) * 32.0f;
             button->z               = 0.0;
             button->scale           = 0.175;
             button->alpha           = 0; // hidden until the Gameplay panel is shown
@@ -245,7 +272,7 @@ void SettingsScreen_Create(void *objPtr)
         }
     }
     SettingsScreen_UpdateGameplayButtons(self);
-    self->gpSelected = 0;
+    self->gpSelected = 1;
 
     if (Engine.gameDeviceType == RETRO_MOBILE) {
         switch (GetGlobalVariableByName("options.physicalControls")) {
@@ -897,6 +924,7 @@ void SettingsScreen_Main(void *objPtr)
                 self->state = SETTINGSSCREEN_STATE_FLIP_GAMEPLAY;
             break;
         case SETTINGSSCREEN_STATE_FLIP_GAMEPLAY: {
+            SettingsScreen_PlaceGameplayRows(self);
             self->buttonRotY -= (10.0 * Engine.deltaTime);
             if (self->buttonRotY < -(M_PI / 2)) {
                 self->state      = SETTINGSSCREEN_STATE_FINISHFLIP_GAMEPLAY;
@@ -943,6 +971,7 @@ void SettingsScreen_Main(void *objPtr)
             for (int l = 0; l < SETTINGSSCREEN_BTN_COUNT; ++l) self->buttons[l]->renderMatrix = self->buttonMatrix;
             break;
         case SETTINGSSCREEN_STATE_GAMEPLAY: {
+            SettingsScreen_PlaceGameplayRows(self);
             CheckKeyDown(&keyDown);
             CheckKeyPress(&keyPress);
             SetRenderMatrix(&self->tempMatrix);
@@ -950,17 +979,17 @@ void SettingsScreen_Main(void *objPtr)
                 if (touches <= 0) {
                     if (keyPress.up) {
                         PlaySfxByName("Menu Move", false);
-                        self->gpSelected = (self->gpSelected + 3) % 4;
+                        self->gpSelected = self->gpSelected == 1 ? 3 : self->gpSelected - 1;
                     }
                     if (keyPress.down) {
                         PlaySfxByName("Menu Move", false);
-                        self->gpSelected = (self->gpSelected + 1) % 4;
+                        self->gpSelected = self->gpSelected == 3 ? 1 : self->gpSelected + 1;
                     }
                     if (keyPress.left || keyPress.right) {
                         PlaySfxByName("Menu Move", false);
                         SettingsScreen_SetGameplay(self, self->gpSelected, keyPress.left ? 0 : 1);
                     }
-                    for (int i = SETTINGSSCREEN_BTN_GP_STYLE_CD; i < SETTINGSSCREEN_BTN_COUNT; ++i) self->buttons[i]->state = PUSHBUTTON_STATE_UNSELECTED;
+                    for (int i = SETTINGSSCREEN_BTN_GP_SPINDASH_ON; i < SETTINGSSCREEN_BTN_COUNT; ++i) self->buttons[i]->state = PUSHBUTTON_STATE_UNSELECTED;
                     self->buttons[SETTINGSSCREEN_BTN_GP_STYLE_CD + self->gpSelected * 2 + SettingsScreen_GameplayActive(self->gpSelected)]->state =
                         PUSHBUTTON_STATE_SELECTED;
                     if (keyPress.B) {
@@ -975,7 +1004,7 @@ void SettingsScreen_Main(void *objPtr)
             }
             else {
                 if (touches <= 0) {
-                    for (int i = SETTINGSSCREEN_BTN_GP_STYLE_CD; i < SETTINGSSCREEN_BTN_COUNT; ++i) {
+                    for (int i = SETTINGSSCREEN_BTN_GP_SPINDASH_ON; i < SETTINGSSCREEN_BTN_COUNT; ++i) {
                         if (self->buttons[i]->state == PUSHBUTTON_STATE_SELECTED) {
                             PlaySfxByName("Menu Move", false);
                             self->buttons[i]->state = PUSHBUTTON_STATE_UNSELECTED;
@@ -990,11 +1019,11 @@ void SettingsScreen_Main(void *objPtr)
                     }
                     else if (keyDown.up || keyDown.down) {
                         usePhysicalControls = true;
-                        self->gpSelected    = 0;
+                        self->gpSelected    = 1;
                     }
                 }
                 else {
-                    for (int i = SETTINGSSCREEN_BTN_GP_STYLE_CD; i < SETTINGSSCREEN_BTN_COUNT; ++i) {
+                    for (int i = SETTINGSSCREEN_BTN_GP_SPINDASH_ON; i < SETTINGSSCREEN_BTN_COUNT; ++i) {
                         NativeEntity_PushButton *b = self->buttons[i];
                         b->state = CheckTouchRect(b->x, b->y - 8.0f, (b->textWidth + (b->scale * 64.0f)) * 0.75f, 12.0f) >= 0;
                     }
@@ -1209,12 +1238,12 @@ void SettingsScreen_Main(void *objPtr)
             RenderImage(0.0, 0.0, 0.0, 0.275, 0.275, 512.0, 256.0, 1024.0, 512.0, 0.0, 0.0, 255, self->controllerTex);
             break;
         case SETTINGSSCREEN_STATEDRAW_GAMEPLAY:
-            for (int r = 0; r < 4; ++r) {
+            for (int r = 1; r < 4; ++r) {
                 if (usePhysicalControls && self->gpSelected == r)
                     SetRenderVertexColor(0xFF, 0xFF, 0x00);
                 else
                     SetRenderVertexColor(0xFF, 0xFF, 0xFF);
-                RenderText(self->gameplayRowText[r], FONT_LABEL, -128.0, 58.0 - r * 32.0, 0, 0.1, 255);
+                RenderText(self->gameplayRowText[r], FONT_LABEL, -128.0, 58.0 - (r - 1) * 32.0, 0, Engine.language == RETRO_JP ? 0.09 : 0.125, 255);
             }
             SetRenderVertexColor(0xFF, 0xFF, 0xFF);
             break;
