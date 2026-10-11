@@ -1278,12 +1278,12 @@ void SettingsScreen_Main(void *objPtr)
             }
             SetRenderVertexColor(0xFF, 0xFF, 0xFF);
             if (self->gpNoteK > 0.0f) {
-                const char *noteSrc = "The changes will not take effect until you restart the game";
+                const char *noteSrc = "The changes will not take effect\runtil you restart the game";
                 ushort note[128];
                 SetStringToFont8(note, noteSrc, FONT_TEXT);
-                float full = 240.0f / (GetTextWidth(note, FONT_TEXT, 1.0f) + 1.0f);
-                if (full > 0.4f)
-                    full = 0.4f;
+                float full = 290.0f / (GetTextWidth(note, FONT_TEXT, 1.0f) + 1.0f);
+                if (full > 0.6f)
+                    full = 0.6f;
                 float ns = full * self->gpNoteK;
                 SetRenderVertexColor(0xFF, 0x80, 0x00);
                 RenderText(note, FONT_TEXT, GetTextWidth(note, FONT_TEXT, ns) * -0.5f, -66.0f - GetTextHeight(note, FONT_TEXT, ns) * 0.5f, 0, ns, 255);
