@@ -1,26 +1,20 @@
 #ifndef VIDEO_HPP
 #define VIDEO_HPP
 
-extern int currentVideoFrame;
-extern int videoFrameCount;
-extern int videoWidth;
-extern int videoHeight;
-extern float videoAR;
+// Only the symbols other translation units actually use are exported. Everything that used to be a global but was only ever touched by
+// Video.cpp (currentVideoFrame, videoFrameCount, videoAR, videoVidData, callbacks, videoData, videoFilePos, vidFrameMS, vidBaseticks,
+// videoSkipped, videoTouchHeld) is now `static` in Video.cpp -- fewer exported symbols, and no more generic names like `callbacks`
+// leaking into every file that includes this header.
 
-extern THEORAPLAY_Decoder *videoDecoder;
-extern const THEORAPLAY_VideoFrame *videoVidData;
-extern THEORAPLAY_Io callbacks;
+extern int videoWidth;  // read by Drawing.cpp (SDL2 renderer path)
+extern int videoHeight; // read by Drawing.cpp (SDL2 renderer path)
 
-extern byte videoData;
-extern int videoFilePos;
-extern bool videoPlaying;
-extern int vidFrameMS;
-extern int vidBaseticks;
+extern THEORAPLAY_Decoder *videoDecoder; // read by the audio thread (Audio.cpp)
+extern bool videoPlaying;                // read by the audio thread (Audio.cpp)
 
-extern bool videoSkipped;
-extern int videoFadeIn;
-extern int videoFadeOut;
-extern int videoPrevRefreshRate;
+extern int videoFadeIn;           // read by Drawing.cpp
+extern int videoFadeOut;          // read by Drawing.cpp
+extern int videoPrevRefreshRate;  // read by RetroGameLoop.cpp
 
 void PlayVideoFile(char *filePath);
 void UpdateVideoFrame();
