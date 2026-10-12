@@ -19,6 +19,14 @@ int videoPrevRefreshRate = 0; // Engine.refreshRate from just before we throttle
 static const THEORAPLAY_VideoFrame *videoVidData = nullptr; // frame fetched from the decoder, waiting for its play time
 static THEORAPLAY_Io callbacks;
 
+// How many decoded frames THEORAPLAY may keep buffered ahead of playback (its `maxframes`). Note this is NOT a frame rate. On the RGBA paths
+// (SDL1 / SDL2 + OpenGL) every buffered frame costs width * height * 4 bytes, so 30 frames of a 1280x720 video is ~110 MB and of a
+// 1920x1080 video ~250 MB -- far too much for a phone. A smaller value saves that memory but leaves less slack for the decoder thread to
+// ride out slow stretches, so lower it only if the videos you ship are large. It can be overridden from the build flags (-DVIDEO_MAX_BUFFERED_FRAMES=12).
+#ifndef VIDEO_MAX_BUFFERED_FRAMES
+#define VIDEO_MAX_BUFFERED_FRAMES 30
+#endif
+
 static bool videoSkipped   = false;
 static bool videoTouchHeld = false; // tracks whether the screen was already being touched, so we can require a fresh tap to skip
 static int vidFrameMS      = 0;
@@ -129,9 +137,11 @@ void PlayVideoFile(char *filePath)
     // The SDL2 renderer path uploads planar YUV straight into a YV12 texture. Every other path (SDL1, and SDL2 + OpenGL) wants a
     // 32-bit RGBA frame, so the decoder must output RGBA there.
 #if RETRO_USING_SDL2 && !RETRO_USING_OPENGL
-    videoDecoder = THEORAPLAY_startDecode(&callbacks, /*FPS*/ 30, THEORAPLAY_VIDFMT_IYUV, GetGlobalVariableByName("Options.Soundtrack") ? 1 : 0);
+    videoDecoder =
+        THEORAPLAY_startDecode(&callbacks, VIDEO_MAX_BUFFERED_FRAMES, THEORAPLAY_VIDFMT_IYUV, GetGlobalVariableByName("Options.Soundtrack") ? 1 : 0);
 #else
-    videoDecoder = THEORAPLAY_startDecode(&callbacks, /*FPS*/ 30, THEORAPLAY_VIDFMT_RGBA, GetGlobalVariableByName("Options.Soundtrack") ? 1 : 0);
+    videoDecoder =
+        THEORAPLAY_startDecode(&callbacks, VIDEO_MAX_BUFFERED_FRAMES, THEORAPLAY_VIDFMT_RGBA, GetGlobalVariableByName("Options.Soundtrack") ? 1 : 0);
 #endif
 
     if (!videoDecoder) {
@@ -338,32 +348,36 @@ int ProcessVideo()
 
 void StopVideoPlayback()
 {
-    if (videoPlaying) {
-        // `videoPlaying` and `videoDecoder` are read by
-        // the audio thread, so lock it to prevent a race
-        // condition that results in invalid memory accesses.
-        SDL_LockAudio();
+    if (!videoPlaying)
+        return;
 
-        if (videoVidData) {
-            THEORAPLAY_freeVideo(videoVidData);
-            videoVidData = NULL;
-        }
-#if VIDEO_DIRECT_GL
-        if (videoPendingFrame) {
-            THEORAPLAY_freeVideo(videoPendingFrame);
-            videoPendingFrame = NULL;
-        }
-#endif
-        if (videoDecoder) {
-            THEORAPLAY_stopDecode(videoDecoder);
-            videoDecoder = NULL;
-        }
-
-        CloseVideoBuffer();
-        videoPlaying = false;
-
-        SDL_UnlockAudio();
+    // Everything that only the main thread touches is released first, with no lock held. (CloseVideoBuffer checks videoPlaying, so it has
+    // to run before the flag is cleared below.)
+    if (videoVidData) {
+        THEORAPLAY_freeVideo(videoVidData);
+        videoVidData = NULL;
     }
+#if VIDEO_DIRECT_GL
+    if (videoPendingFrame) {
+        THEORAPLAY_freeVideo(videoPendingFrame);
+        videoPendingFrame = NULL;
+    }
+#endif
+    CloseVideoBuffer();
+
+    // `videoPlaying` and `videoDecoder` are read by the audio thread, so they are changed under the audio lock to avoid a race that
+    // results in invalid memory accesses. The lock is held only for those two assignments: THEORAPLAY_stopDecode() joins the decoder
+    // thread (which may first have to finish decoding a frame) and then frees every queued frame/packet, and doing that with the audio
+    // lock held could stall the audio callback for the whole time -- a possible audible hitch whenever a video ended or was skipped. Once the
+    // pointer is detached the audio thread can no longer reach the decoder, so stopping it outside the lock is just as safe.
+    SDL_LockAudio();
+    THEORAPLAY_Decoder *decoder = videoDecoder;
+    videoDecoder                = nullptr;
+    videoPlaying                = false;
+    SDL_UnlockAudio();
+
+    if (decoder)
+        THEORAPLAY_stopDecode(decoder);
 }
 
 #if RETRO_USING_OPENGL
@@ -393,6 +407,10 @@ void CreateVideoTexture(int width, int height)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Same wrap mode the engine's own textures use (Drawing.cpp). Video sizes are rarely a power of two, and OpenGL ES 1.x only allows
+    // non-power-of-two textures with clamped wrapping; it also stops the linear filter from bleeding the opposite edge into the border.
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     videoFrameDirty     = false;

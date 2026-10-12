@@ -6,6 +6,9 @@
 // videoSkipped, videoTouchHeld) is now `static` in Video.cpp -- fewer exported symbols, and no more generic names like `callbacks`
 // leaking into every file that includes this header.
 
+// Forward declaration so this header no longer depends on theoraplay.h having been included first (same type as theoraplay.h's typedef)
+struct THEORAPLAY_Decoder;
+
 extern int videoWidth;  // read by Drawing.cpp (SDL2 renderer path)
 extern int videoHeight; // read by Drawing.cpp (SDL2 renderer path)
 
