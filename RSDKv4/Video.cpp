@@ -9,9 +9,8 @@ bool videoPlaying                = false;
 // Dedicated to the video only -- kept separate from the engine's shared screen-fade globals (fadeMode/fadeR/G/B/A, set by the
 // script-facing SetScreenFade) so a script fading the screen right before/after a video (as Start.txt does) can never interact
 // with the video's own fade in/out
-int videoFadeIn          = 0; // 0..255, counts DOWN from 255 to 0 over the first ~32 frames: the video brightens in
-int videoFadeOut         = 0; // 0..255, counts UP from 0 once a skip/natural end is detected: the video darkens out
-int videoPrevRefreshRate = 0; // Engine.refreshRate from just before we throttled it down to the video's own fps; restored once it ends
+int videoFadeIn  = 0; // 0..255, counts DOWN from 255 to 0 over the first ~32 engine ticks: the video brightens in
+int videoFadeOut = 0; // 0..255, counts UP from 0 once a skip/natural end is detected: the video darkens out
 
 // ---------------------------------------------------------------------------------------------------------------------------------
 // Internal state
@@ -184,15 +183,9 @@ void PlayVideoFile(char *filePath)
     videoFadeIn  = 0xFF;
     videoFadeOut = 0;
 
-    // The whole engine loop normally runs at Engine.refreshRate (60 by default), via RetroEngine::Run()'s own frame timer. Nothing
-    // needs to happen faster than the video's own frame rate while it plays -- there's no gameplay to update (ProcessObjects only
-    // runs during ENGINE_MAINGAME) and nothing new to show between the video's own frames -- so throttling the loop itself down to
-    // match saves the whole render pass each skipped tick, not just the redundant texture upload
-    videoPrevRefreshRate = Engine.refreshRate;
-    const int videoTargetRate = (int)(videoVidData->fps + 0.5);
-    if (videoTargetRate >= 1)
-        Engine.refreshRate = videoTargetRate;
-    // else: fps unknown/zero -- leave Engine.refreshRate untouched rather than risk a bad value
+    // Note: the engine loop keeps running at the normal Engine.refreshRate while the video plays, exactly like RSDKv3. It used to be
+    // throttled down to the video's own fps here, but a tick rate equal to the frame rate made every late tick duplicate or drop a
+    // frame, and Engine.refreshRate is also what SaveSettings() writes to settings.ini.
 
     Engine.gameMode = ENGINE_VIDEOWAIT;
 }

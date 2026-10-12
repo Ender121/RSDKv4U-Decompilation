@@ -529,19 +529,23 @@ void RetroEngine::Run()
 {
     Engine.deltaTime = 0.0f;
 
-    const unsigned long long perfFreq = SDL_GetPerformanceFrequency();
-    unsigned long long curTicks       = 0;
-    unsigned long long prevTicks      = 0;
+    const unsigned long long perfFreq   = SDL_GetPerformanceFrequency();
+    const unsigned long long targetFreq = perfFreq / Engine.refreshRate;
+    unsigned long long curTicks         = 0;
+    unsigned long long prevTicks        = 0;
 
     while (running) {
 #if !RETRO_USE_ORIGINAL_CODE
         if (!vsync) {
-            // Recomputed every iteration (not just once, like before) so a runtime change to Engine.refreshRate takes effect immediately
-            // -- see ENGINE_VIDEOWAIT, which throttles this down to the video's own frame rate while one is playing
-            const unsigned long long targetFreq = perfFreq / Engine.refreshRate;
-            curTicks                            = SDL_GetPerformanceCounter();
-            if (curTicks < prevTicks + targetFreq)
+            curTicks = SDL_GetPerformanceCounter();
+            if (curTicks < prevTicks + targetFreq) {
+                // This wait is a busy loop, which pins a CPU core. While a video plays there is nothing to do between ticks, and that
+                // core is better left to the video decoder thread (and the battery), so sleep through the bulk of the wait. The last
+                // ~2 ms are still spun so the tick doesn't come late. Gameplay timing is untouched.
+                if (Engine.gameMode == ENGINE_VIDEOWAIT && prevTicks + targetFreq - curTicks > perfFreq / 500)
+                    SDL_Delay(1);
                 continue;
+            }
             prevTicks = curTicks;
         }
 

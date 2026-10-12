@@ -15,9 +15,8 @@ extern int videoHeight; // read by Drawing.cpp (SDL2 renderer path)
 extern THEORAPLAY_Decoder *videoDecoder; // read by the audio thread (Audio.cpp)
 extern bool videoPlaying;                // read by the audio thread (Audio.cpp)
 
-extern int videoFadeIn;           // read by Drawing.cpp
-extern int videoFadeOut;          // read by Drawing.cpp
-extern int videoPrevRefreshRate;  // read by RetroGameLoop.cpp
+extern int videoFadeIn;  // read by Drawing.cpp
+extern int videoFadeOut; // read by Drawing.cpp
 
 void PlayVideoFile(char *filePath);
 void UpdateVideoFrame();

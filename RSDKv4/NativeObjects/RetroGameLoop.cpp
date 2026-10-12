@@ -49,10 +49,8 @@ void RetroGameLoop_Main(void *objPtr)
         case ENGINE_WAIT: break;
 
         case ENGINE_VIDEOWAIT:
-            if (ProcessVideo() != 2) { // 1: video finished / skipped, 0: nothing is actually playing
-                Engine.refreshRate = videoPrevRefreshRate; // undo the throttle PlayVideoFile applied for the video's own fps
-                Engine.gameMode    = ENGINE_MAINGAME;
-            }
+            if (ProcessVideo() != 2) // 1: video finished / skipped, 0: nothing is actually playing
+                Engine.gameMode = ENGINE_MAINGAME;
 #if RETRO_USING_OPENGL
             else {
                 // Its own texture at the video's real resolution, not the small internal game-screen buffer TransferRetroBuffer/
