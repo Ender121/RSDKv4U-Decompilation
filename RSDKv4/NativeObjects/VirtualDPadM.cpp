@@ -83,13 +83,13 @@ void VirtualDPadM_Main(void *objPtr)
             float pauseYPos = self->pauseY;
 
             if (Engine.gameType == GAME_SONICCD) {
-                // Sonic CD: fases normales en la posicion que v4 usa en Special (pauseX_S); fases Special en la esquina superior derecha
+                // Sonic CD: fases normales en center-60 (la de Special de v4, center-52, movida 8px a la izquierda); fases Special en la esquina superior derecha
                 if (activeStageList == STAGELIST_SPECIAL) {
                     pauseXPos = SCREEN_CENTERX - 16.0f;
                     pauseYPos = SCREEN_CENTERY - 16.0f;
                 }
                 else
-                    pauseXPos = self->pauseX_S;
+                    pauseXPos = SCREEN_CENTERX - 60.0f; // 8px mas a la izquierda que en Special de v4, para no tocar el HUD (vidas) de las fases normales
             }
             else if (activeStageList == STAGELIST_SPECIAL) {
                 pauseXPos = self->pauseX_S;

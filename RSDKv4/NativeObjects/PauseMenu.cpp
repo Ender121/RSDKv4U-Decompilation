@@ -180,8 +180,8 @@ void PauseMenu_Create(void *objPtr)
     self->dpadX             = SCREEN_CENTERX_F - 76.0;
     self->dpadXSpecial      = SCREEN_CENTERX_F - 52.0;
     if (Engine.gameType == GAME_SONICCD) {
-        // Sonic CD (igual que VirtualDPad/VirtualDPadM): fases normales en la posicion de Special de v4 (center-52), Special en la esquina
-        self->dpadX        = SCREEN_CENTERX_F - 52.0;
+        // Sonic CD (igual que VirtualDPad/VirtualDPadM): fases normales en center-60 (Special de v4 movida 8px a la izquierda, para no tocar el HUD), Special en la esquina
+        self->dpadX        = SCREEN_CENTERX_F - 60.0;
         self->dpadXSpecial = SCREEN_CENTERX_F - 16.0;
         self->dpadY        = SCREEN_CENTERY_F - 16.0;
     }
