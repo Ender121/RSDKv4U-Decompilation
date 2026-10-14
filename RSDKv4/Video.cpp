@@ -29,7 +29,8 @@ static THEORAPLAY_Io callbacks;
 static bool videoSkipped   = false;
 static bool videoTouchHeld = false; // tracks whether the screen was already being touched, so we can require a fresh tap to skip
 static int vidFrameMS      = 0;
-static Uint32 vidBaseticks = 0;
+static Uint32 vidLastTicks = 0; // SDL_GetTicks() at the previous ProcessVideo call
+static Uint32 vidClockMS   = 0; // playback position in ms; only advances while the game is actually running (see ProcessVideo)
 
 // Legacy .rsv (GIF-based) video state, used by UpdateVideoFrame only
 static int currentVideoFrame = 0;
@@ -168,7 +169,8 @@ void PlayVideoFile(char *filePath)
     videoHeight = videoVidData->height;
 
     SetupVideoBuffer(videoWidth, videoHeight);
-    vidBaseticks = SDL_GetTicks();
+    vidLastTicks = SDL_GetTicks();
+    vidClockMS   = 0;
     vidFrameMS   = (videoVidData->fps == 0.0) ? 0 : ((int)(1000.0 / videoVidData->fps));
     videoPlaying = true;
     trackID      = TRACK_COUNT - 1;
@@ -247,6 +249,19 @@ int ProcessVideo()
 {
     if (!videoPlaying)
         return 0; // its not even initialised
+    // The video clock only advances while the app is really running. It used to be `SDL_GetTicks() - startTime`, i.e. wall-clock time, so
+    // leaving the app for 3 seconds made the video jump 3 seconds ahead on return (all those frames were skipped to "catch up") while the
+    // audio -- which the device stops while the app is in the background -- carried on from where it left off. Any gap between two calls
+    // that is far longer than a frame means the app was suspended (or frozen), so it is not counted.
+    // (Done at the top of the function so the clock is also kept up to date while fading out.)
+
+    {
+        const Uint32 ticks = SDL_GetTicks();
+        const Uint32 delta = ticks - vidLastTicks;
+        vidLastTicks       = ticks;
+        if (Engine.hasFocus && delta < 500) // 500ms: ~30 frames at 60fps; longer than that = app was in the background
+            vidClockMS += delta;
+    }
 
     CheckKeyPress(&keyPress);
 
@@ -286,7 +301,7 @@ int ProcessVideo()
         return 2;
     }
 
-    const Uint32 now = SDL_GetTicks() - vidBaseticks;
+    const Uint32 now = vidClockMS;
 
     if (!videoVidData)
         videoVidData = THEORAPLAY_getVideo(videoDecoder);
