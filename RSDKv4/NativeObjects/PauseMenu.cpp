@@ -179,6 +179,13 @@ void PauseMenu_Create(void *objPtr)
     self->miniPauseDisabled = true;
     self->dpadX             = SCREEN_CENTERX_F - 76.0;
     self->dpadXSpecial      = SCREEN_CENTERX_F - 52.0;
+    if (Engine.gameType == GAME_SONICCD) {
+        // Sonic CD: el botón de pausa va siempre en la esquina superior derecha (igual que en VirtualDPad/VirtualDPadM),
+        // en fases normales y en Special, para que no salte al entrar/salir de la pausa
+        self->dpadX        = SCREEN_CENTERX_F - 16.0;
+        self->dpadXSpecial = SCREEN_CENTERX_F - 16.0;
+        self->dpadY        = SCREEN_CENTERY_F - 16.0;
+    }
 }
 void PauseMenu_Main(void *objPtr)
 {

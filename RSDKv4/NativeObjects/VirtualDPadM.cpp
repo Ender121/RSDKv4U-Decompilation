@@ -82,8 +82,8 @@ void VirtualDPadM_Main(void *objPtr)
             float pauseXPos = self->pauseX;
             float pauseYPos = self->pauseY;
 
-            if (Engine.gameType == GAME_SONICCD && activeStageList == STAGELIST_SPECIAL) {
-                // Posición en la esquina superior derecha exacta para fases especiales de Sonic CD
+            if (Engine.gameType == GAME_SONICCD) {
+                // Sonic CD: esquina superior derecha en todas las fases (Special y normales); el resto de juegos conservan la posición de v4
                 pauseXPos = SCREEN_CENTERX - 16.0f;
                 pauseYPos = SCREEN_CENTERY - 16.0f;
             }
