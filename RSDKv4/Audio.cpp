@@ -34,6 +34,11 @@ int currentMusicTrack = -1;
 #if RETRO_USING_SDL2
 SDL_AudioDeviceID audioDevice;
 SDL_AudioStream *ogv_stream;
+static bool ogvWasPlaying      = false; // video audio was being fed last callback (audio thread only)
+static bool ogvFlushed         = false; // stream already flushed for the current video (audio thread only)
+static int ogvStreamFreq       = 48000; // format ogv_stream is currently built for
+static int ogvStreamChannels   = 2;
+static THEORAPLAY_Decoder *ogvLastDecoder = NULL; // detects a new video starting without an idle callback in between
 #endif
 SDL_AudioSpec audioDeviceFormat;
 
@@ -337,6 +342,58 @@ void ProcessAudioPlayback(void *userdata, Uint8 *stream, int len)
 
     Sint16 *output_buffer = (Sint16 *)stream;
 
+#if RETRO_USING_SDL2
+    // Video audio: pull everything THEORAPLAY has decoded into the SDL audio stream ONCE per callback. It used to be done for every
+    // MIX_BUFFER_SAMPLES chunk (16x per callback), each time taking the decoder's mutex shared with the decoding thread.
+    bool vidAudioActive = false;
+    if (videoPlaying && videoDecoder && ogv_stream) {
+        vidAudioActive = true;
+        ogvWasPlaying  = true;
+
+        if (videoDecoder != ogvLastDecoder) { // a new video: forget the previous one's state
+            SDL_AudioStreamClear(ogv_stream);
+            ogvFlushed      = false;
+            ogvLastDecoder  = videoDecoder;
+        }
+
+        // Ask isDecoding() *before* draining, so a packet that lands in between is not lost when we decide the file has ended
+        const bool stillDecoding = THEORAPLAY_isDecoding(videoDecoder) != 0;
+
+        const THEORAPLAY_AudioPacket *packet;
+        while ((packet = THEORAPLAY_getAudio(videoDecoder)) != NULL) {
+            // The stream used to be hardcoded to 48000 Hz stereo; follow what the file actually contains
+            if (packet->freq != ogvStreamFreq || packet->channels != ogvStreamChannels) {
+                SDL_FreeAudioStream(ogv_stream);
+                ogv_stream = SDL_NewAudioStream(AUDIO_F32SYS, (Uint8)packet->channels, packet->freq, audioDeviceFormat.format,
+                                                audioDeviceFormat.channels, audioDeviceFormat.freq);
+                ogvStreamFreq     = packet->freq;
+                ogvStreamChannels = packet->channels;
+                if (!ogv_stream) {
+                    THEORAPLAY_freeAudio(packet);
+                    vidAudioActive = false;
+                    break;
+                }
+            }
+            SDL_AudioStreamPut(ogv_stream, packet->samples, packet->frames * sizeof(float) * packet->channels);
+            THEORAPLAY_freeAudio(packet);
+        }
+
+        // Only once the decoder is done is it safe to flush (pushes the resampler's last samples out). Doing it any earlier punched
+        // gaps into the audio whenever the decoder was a little behind.
+        if (vidAudioActive && !stillDecoding && !ogvFlushed) {
+            SDL_AudioStreamFlush(ogv_stream);
+            ogvFlushed = true;
+        }
+    }
+    else if (ogvWasPlaying && ogv_stream) {
+        // Video stopped: drop leftovers so they don't play at the start of the next one. Only on the transition, not every callback.
+        SDL_AudioStreamClear(ogv_stream);
+        ogvWasPlaying = false;
+        ogvFlushed    = false;
+        ogvLastDecoder = NULL;
+    }
+#endif
+
     size_t samples_remaining = (size_t)len / sizeof(Sint16);
     while (samples_remaining != 0) {
         Sint32 mix_buffer[MIX_BUFFER_SAMPLES];
@@ -348,33 +405,18 @@ void ProcessAudioPlayback(void *userdata, Uint8 *stream, int len)
         ProcessMusicStream(mix_buffer, samples_to_do * sizeof(Sint16));
 
 #if RETRO_USING_SDL2
-        // Mix the audio of the video that is currently playing
-        if (videoPlaying && videoDecoder) {
-            // Fetch THEORAPLAY audio packets, and shove them into the SDL Audio Stream
+        // Mix the audio of the video that is currently playing (it was already fed into ogv_stream once for the whole callback, above)
+        if (vidAudioActive) {
             const size_t bytes_to_do = samples_to_do * sizeof(Sint16);
-
-            const THEORAPLAY_AudioPacket *packet;
-
-            while ((packet = THEORAPLAY_getAudio(videoDecoder)) != NULL) {
-                SDL_AudioStreamPut(ogv_stream, packet->samples, packet->frames * sizeof(float) * 2); // 2 for stereo
-                THEORAPLAY_freeAudio(packet);
-            }
-
             Sint16 vidBuffer[MIX_BUFFER_SAMPLES];
 
-            // If we need more samples, assume we've reached the end of the file, and flush the audio stream so we can get more.
-            // If we were wrong and there's still more file left, there will be a gap in the audio.
-            if ((size_t)SDL_AudioStreamAvailable(ogv_stream) < bytes_to_do)
-                SDL_AudioStreamFlush(ogv_stream);
-
-            // Fetch the converted audio data, which is ready for mixing.
+            // Fetch the converted audio data, which is ready for mixing. If the decoder is momentarily behind we simply get less than
+            // asked for and the rest of this chunk stays silent -- a short, clean underrun instead of flushing the stream mid-video
+            // (a flush pads/resets the resampler and clicks, and the old code did it on every chunk the decoder had not caught up on).
             int get = SDL_AudioStreamGet(ogv_stream, vidBuffer, (int)bytes_to_do);
 
-            if (get != -1)
+            if (get > 0)
                 ProcessAudioMixing(mix_buffer, vidBuffer, get / sizeof(Sint16), MAX_VOLUME, 0);
-        }
-        else {
-            SDL_AudioStreamClear(ogv_stream); // Prevent leftover audio from playing at the start of the next video
         }
 #endif
 
